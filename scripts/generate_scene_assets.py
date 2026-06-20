@@ -24,7 +24,11 @@ import urllib.parse
 import urllib.request
 
 IMAGE_BASE_URL = os.getenv("IMAGE_BASE_URL", "https://image.pollinations.ai/prompt/")
-STYLE_SUFFIX = ", modern flat illustration, soft gradient, cinematic lighting, 16:9, highly detailed, no text, no watermark"
+STYLE_SUFFIX = (
+    ", photorealistic, ultra-realistic professional photograph, DSLR photo, "
+    "high resolution, sharp focus, fine detail, natural lighting, 16:9, "
+    "no text, no caption, no watermark, no illustration, not a drawing"
+)
 
 
 def ffprobe_duration(path: str) -> float:
@@ -80,8 +84,8 @@ def main() -> int:
     ap.add_argument("--scenes", default="scenes.json")
     ap.add_argument("--voice", default="zh-TW-HsiaoChenNeural")
     ap.add_argument("--workdir", default="build")
-    ap.add_argument("--width", type=int, default=854)
-    ap.add_argument("--height", type=int, default=480)
+    ap.add_argument("--width", type=int, default=1280)
+    ap.add_argument("--height", type=int, default=720)
     args = ap.parse_args()
 
     os.makedirs(args.workdir, exist_ok=True)

@@ -39,6 +39,23 @@ def srt_time(t: float) -> str:
     return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
 
 
+# Subtitles must show NO punctuation. Pause marks become a space; the rest drop.
+_PUNCT_TO_SPACE = "，、,;；"
+_PUNCT_DROP = "。.！!？?：:…—–~「」『』（）()【】《》〈〉\"'`·．,।"
+
+
+def strip_punct(s: str) -> str:
+    out = []
+    for ch in s:
+        if ch in _PUNCT_TO_SPACE:
+            out.append(" ")
+        elif ch in _PUNCT_DROP:
+            continue
+        else:
+            out.append(ch)
+    return re.sub(r"\s+", " ", "".join(out)).strip()
+
+
 def split_chunks(text: str, max_len: int = 20) -> list[str]:
     parts = re.split(r"(?<=[。！？!?，,、；;])", text)
     chunks, cur = [], ""
@@ -70,7 +87,9 @@ def build_srt(scenes: list[dict], starts: list[float], total: float, path: str) 
         span = max(win_end - win_start, 0.5)
         for c in chunks:
             cd = span * (len(c) / total_chars)
-            cues.append((ct, min(ct + cd, win_end), c))
+            disp = strip_punct(c)  # timing from original length; display without punctuation
+            if disp:
+                cues.append((ct, min(ct + cd, win_end), disp))
             ct += cd
     with open(path, "w", encoding="utf-8") as fh:
         for i, (a, b, txt) in enumerate(cues, 1):

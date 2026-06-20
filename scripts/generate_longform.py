@@ -42,8 +42,9 @@ def outline(topic: str, scenes: int) -> dict:
         f"規劃一支長影音，切成剛好 {scenes} 個分鏡(scene)，要有起承轉合、循序漸進、不重複。\n"
         "每個 scene 給：\n"
         "1) brief：用一句話說明這段要講什麼（之後會擴寫成旁白）。\n"
-        "2) image_prompt：一句英文，描述這段對應的背景示意圖"
-        "（modern flat illustration, soft gradient, cinematic, 16:9, no text）。\n"
+        "2) image_prompt：一句英文，描述這段對應的『真實照片』背景"
+        "（photorealistic real photograph of a concrete scene/place/object, "
+        "realistic, sharp, 16:9, no text；不要插畫、不要手繪、不要抽象）。\n"
         '只輸出：{"title":"<吸睛標題>","scenes":[{"brief":"...","image_prompt":"..."}]}'
     )
     data = parse_json(complete(OUTLINE_SYS, prompt, max_tokens=4000))
@@ -73,7 +74,7 @@ def fallback(topic: str, scenes: int, per_chars: int) -> dict:
         "scenes": [
             {
                 "narration": (f"第 {i + 1} 段：關於「{t}」。" + pad * (per_chars // len(pad) + 1))[:per_chars],
-                "image_prompt": f"modern flat illustration about {t}, scene {i + 1}, soft gradient, cinematic, 16:9, no text",
+                "image_prompt": f"photorealistic professional photograph related to {t}, scene {i + 1}, realistic, sharp focus, 16:9, no text",
             }
             for i in range(scenes)
         ],
@@ -98,7 +99,7 @@ def main() -> int:
         ol = outline(args.topic, scenes)
         title = ol.get("title", args.topic)
         briefs = [s.get("brief", "") for s in ol["scenes"]]
-        prompts = [s.get("image_prompt", f"illustration scene, soft gradient, 16:9, no text") for s in ol["scenes"]]
+        prompts = [s.get("image_prompt", "photorealistic professional photograph, realistic, sharp, 16:9, no text") for s in ol["scenes"]]
         out_scenes = []
         for i in range(len(briefs)):
             try:
