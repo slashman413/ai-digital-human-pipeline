@@ -1,0 +1,8 @@
+# Core deps for the CPU jobs (script gen, TTS, digest).
+# Heavier deps are installed per-job in the workflows:
+#   - openai-whisper        (compose-video job: subtitles)
+#   - google-api-python-client, google-auth, google-auth-oauthlib (publish job)
+anthropic>=0.40
+openai>=1.50
+edge-tts>=6.1
+requests>=2.31

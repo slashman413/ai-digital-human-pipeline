@@ -1,0 +1,15 @@
+.env
+__pycache__/
+*.pyc
+output/*.mp4
+audio/*.mp3
+*.srt
+digest.md
+draft_script.txt
+script.txt
+title.txt
+description.txt
+tags.txt
+config/pipeline.yaml
+# keep placeholder dirs
+!assets/.gitkeep

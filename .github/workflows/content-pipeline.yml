@@ -1,0 +1,177 @@
+# === Content Pipeline: 全自動 AI 數字人內容生成 ===
+# 腳本(LLM) → TTS(edge-tts) → 字幕(Whisper) → 合成(FFmpeg) → 發布(YouTube) → 通知(Discord)
+# GPU 口型同步(Wav2Lip) 走 self-hosted runner，預設關閉(見 gpu-processing job)。
+# 沒有任何 secret 也能跑完(LLM 用離線範本、TTS/發布自動降級)，方便先驗證流程。
+name: AI Digital Human — Content Pipeline
+
+on:
+  schedule:
+    - cron: '0 8 * * *'        # 每天 08:00 (UTC)
+  workflow_dispatch:
+    inputs:
+      topic:
+        description: '影片主題（留空 = LLM 自動產生）'
+        required: false
+        type: string
+      voice:
+        description: 'TTS 語音'
+        required: false
+        type: string
+        default: 'zh-CN-XiaoxiaoNeural'
+      publish:
+        description: '是否上傳 YouTube'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  # ===== Job 1：腳本 + TTS（純 CPU，GitHub Hosted）=====
+  generate-content:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install deps
+        run: pip install -r requirements.txt
+
+      - name: Generate script (+ title/description/tags)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: python scripts/generate_script.py --topic "${{ inputs.topic }}" --output script.txt
+
+      - name: Generate TTS (edge-tts)
+        run: |
+          python scripts/generate_tts.py \
+            --input script.txt \
+            --voice "${{ inputs.voice || 'zh-CN-XiaoxiaoNeural' }}" \
+            --output audio/voice.mp3
+
+      - name: Upload content artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-content
+          path: |
+            script.txt
+            title.txt
+            description.txt
+            tags.txt
+            audio/voice.mp3
+          if-no-files-found: warn
+
+  # ===== Job 2：字幕 + 影片合成（純 CPU，FFmpeg）=====
+  compose-video:
+    needs: generate-content
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Download content artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: generated-content
+
+      - name: Generate subtitles (Whisper CPU)
+        run: |
+          pip install openai-whisper
+          python scripts/generate_subtitles.py --audio audio/voice.mp3 --model tiny --output subtitles.srt
+
+      - name: Ensure background asset (placeholder if none committed)
+        run: |
+          mkdir -p assets output
+          if [ ! -f assets/background.png ]; then
+            ffmpeg -y -f lavfi -i color=c=0x1f2937:s=1280x720 -frames:v 1 assets/background.png
+          fi
+
+      - name: Compose final video (FFmpeg)
+        run: |
+          mkdir -p output
+          if [ ! -s audio/voice.mp3 ]; then
+            echo "[warn] no audio — generating 5s silent track so compose still runs"
+            ffmpeg -y -f lavfi -i anullsrc=r=44100:cl=stereo -t 5 audio/voice.mp3
+          fi
+          ffmpeg -y \
+            -loop 1 -i assets/background.png \
+            -i audio/voice.mp3 \
+            -vf "subtitles=subtitles.srt:force_style='FontSize=24,PrimaryColour=&H00FFFFFF'" \
+            -c:v libx264 -preset medium -crf 23 -pix_fmt yuv420p \
+            -c:a aac -b:a 128k -shortest \
+            output/final_video.mp4
+
+      - name: Upload final video
+        uses: actions/upload-artifact@v4
+        with:
+          name: final-video
+          path: |
+            output/final_video.mp4
+            title.txt
+            description.txt
+            tags.txt
+
+  # ===== Job 3：本機 GPU 口型同步（self-hosted，預設關閉）=====
+  gpu-processing:
+    needs: compose-video
+    runs-on: [self-hosted, windows, gpu]
+    if: false   # 設好 self-hosted runner 後改成 true（或用 vars.ENABLE_GPU）
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download final video
+        uses: actions/download-artifact@v4
+        with:
+          name: final-video
+      - name: Wav2Lip lip-sync (GPU)
+        env:
+          WAV2LIP_DIR: ${{ secrets.WAV2LIP_DIR }}
+        run: python scripts/wav2lip_process.py --video output/final_video.mp4 --audio audio/voice.mp3 --output output/talking_head.mp4
+
+  # ===== Job 4：發布 YouTube（手動勾選或排程時）=====
+  publish:
+    needs: compose-video
+    runs-on: ubuntu-latest
+    if: ${{ inputs.publish == true || github.event_name == 'schedule' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Download final video
+        uses: actions/download-artifact@v4
+        with:
+          name: final-video
+      - name: Upload to YouTube (dry-run if no creds)
+        env:
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+        run: |
+          pip install google-api-python-client google-auth google-auth-oauthlib
+          python scripts/upload_youtube.py \
+            --video output/final_video.mp4 \
+            --title "$(cat title.txt 2>/dev/null || echo 'AI 數字人影片')" \
+            --description "$(cat description.txt 2>/dev/null || echo '由 GitHub Actions 自動產生')" \
+            --tags "$(cat tags.txt 2>/dev/null || echo 'AI,數字人')"
+
+  # ===== Job 5：通知 =====
+  notify:
+    needs: [compose-video, publish]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Discord notification
+        if: ${{ secrets.DISCORD_WEBHOOK != '' }}
+        uses: tsickert/discord-webhook@v6
+        with:
+          webhook-url: ${{ secrets.DISCORD_WEBHOOK }}
+          content: |
+            🤖 AI 數字人影片流程完成
+            compose: ${{ needs.compose-video.result }} · publish: ${{ needs.publish.result }}

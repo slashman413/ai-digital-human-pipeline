@@ -1,0 +1,2 @@
+# Put background.png / avatar.png / bgm here. The pipeline auto-generates a
+# placeholder background if none is committed, so it runs without assets.

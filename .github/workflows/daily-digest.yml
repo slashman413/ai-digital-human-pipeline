@@ -1,0 +1,42 @@
+# === Daily Digest: 每日資訊摘要 → 腳本草稿 ===
+# 抓取當日科技熱點 → LLM 摘要 → 產生短影音腳本草稿（存成 artifact 供人工挑選/再加工）。
+name: Daily Content Digest
+
+on:
+  schedule:
+    - cron: '0 6 * * *'    # 06:00 UTC
+    - cron: '0 18 * * *'   # 18:00 UTC
+  workflow_dispatch:
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install deps
+        run: pip install -r requirements.txt
+
+      - name: Fetch & summarize
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: python scripts/fetch_daily_digest.py --limit 10 > digest.md
+
+      - name: Draft short-video script
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: python scripts/script_from_digest.py --input digest.md --format short_video --output draft_script.txt
+
+      - name: Upload digest artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-digest
+          path: |
+            digest.md
+            draft_script.txt

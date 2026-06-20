@@ -1,0 +1,32 @@
+# Optional pipeline config — copy to config/pipeline.yaml and tweak.
+# (The current scripts read CLI args / env; this file documents the knobs you'll
+#  most likely want to wire in as you extend the pipeline.)
+
+content:
+  language: zh-TW
+  default_topic: auto          # "auto" = let the LLM pick a trending topic
+  script_length_words: 180
+  style: "口語、親切、節奏明快"
+
+tts:
+  engine: edge-tts             # edge-tts (free) | elevenlabs | openai
+  voice: zh-CN-XiaoxiaoNeural  # try zh-TW-HsiaoChenNeural for Taiwan accent
+  rate: "+0%"
+
+subtitles:
+  whisper_model: tiny          # tiny | base | small (larger = slower on CPU)
+  burn_in: true
+
+video:
+  resolution: 1280x720
+  background: assets/background.png
+  bgm: ""                      # optional path to background music
+
+avatar:                        # lip-sync / talking-head (needs GPU self-hosted runner)
+  engine: none                 # none | wav2lip | sadtalker | heygen_api | did_api
+  source_image: assets/avatar.png
+
+publish:
+  platforms: [youtube]         # youtube | bilibili | tiktok (only youtube implemented)
+  privacy: private             # private | unlisted | public
+  schedule_cron: "0 8 * * *"
