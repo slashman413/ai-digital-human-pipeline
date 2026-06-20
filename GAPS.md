@@ -4,7 +4,7 @@ repo 本身已經**可以跑完整條流程**（缺憑證時自動降級 dry-run
 
 ## ✅ 已定案（依你 2026-06-20 的決定）
 1. **數字人形式 = 圖文影片**（背景 + 字幕 + 語音），不做真人臉 → 已移除 GPU/Wav2Lip 路徑，不需 self-hosted runner。
-2. **LLM = Claude**（Anthropic，預設 `claude-sonnet-4-6`；`scripts/llm.py`）。
+2. **LLM = Claude**（Anthropic，預設 `claude-opus-4-8` — 跟 Claude Code 用的同一顆最強模型；要省成本可設 `ANTHROPIC_MODEL=claude-sonnet-4-6`）。
 3. **發布平台 = YouTube + TikTok + Bilibili** → 已實作三個 uploader，`publish` job 以 matrix 平行發布。
 
 ## 🔑 還需要你提供的「憑證」（給了才會真的發出去/用真 AI 生成）

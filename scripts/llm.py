@@ -13,8 +13,9 @@ from __future__ import annotations
 
 import os
 
-# Sensible, current defaults. Override via env.
-ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6")
+# Default to Claude Opus 4.8 — the same top-tier model Claude Code runs on.
+# (Most capable; for high-volume/cheaper runs set ANTHROPIC_MODEL=claude-sonnet-4-6.)
+ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-opus-4-8")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o")
 
 

@@ -5,7 +5,7 @@
 ## 1. LLM（腳本/摘要品質）— 擇一
 | Secret | 取得 |
 |--------|------|
-| `ANTHROPIC_API_KEY` | console.anthropic.com（優先採用；模型預設 `claude-sonnet-4-6`）|
+| `ANTHROPIC_API_KEY` | console.anthropic.com（模型預設 `claude-opus-4-8`，與 Claude Code 同款；省成本可設 `ANTHROPIC_MODEL=claude-sonnet-4-6`）|
 | `OPENAI_API_KEY` | platform.openai.com（預設 `gpt-4o`）|
 
 兩者皆未設 → 腳本用內建離線範本（流程能跑，但內容是範本）。
