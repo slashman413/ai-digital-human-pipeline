@@ -174,9 +174,7 @@ jobs:
     steps:
       - name: Discord notification
         if: ${{ env.WEBHOOK != '' }}
-        uses: tsickert/discord-webhook@v6
-        with:
-          webhook-url: ${{ env.WEBHOOK }}
-          content: |
-            🤖 AI 數字人影片流程完成
-            compose: ${{ needs.compose-video.result }} · publish: ${{ needs.publish.result }}
+        run: |
+          curl -s -H "Content-Type: application/json" \
+            -d "{\"content\":\"🤖 AI 數字人影片流程完成 — compose: ${{ needs.compose-video.result }}, publish: ${{ needs.publish.result }}\"}" \
+            "$WEBHOOK"
