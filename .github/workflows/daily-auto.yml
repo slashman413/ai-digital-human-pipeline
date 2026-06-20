@@ -1,0 +1,122 @@
+# === Daily Auto: trend -> video -> auto-post to YouTube + TikTok + Bilibili ===
+# 每天自動：抓 Google Trends 熱門主題 → DeepSeek 寫腳本 → 仿真背景圖 + 台灣腔配音
+# → 合成 720p 影片 → 自動發布到三平台 → Discord 通知。
+# 缺某平台憑證時該平台自動 dry-run，不影響其他平台。
+name: Daily Auto Publish
+
+on:
+  schedule:
+    - cron: '17 1 * * *'      # 每天 01:17 UTC (≈ 09:17 台灣)
+  workflow_dispatch:
+    inputs:
+      topic:
+        description: '主題（留空 = 自動從 Google Trends 抓熱門）'
+        required: false
+        type: string
+      minutes:
+        description: '影片長度（分鐘）'
+        required: false
+        type: string
+        default: '10'
+      geo:
+        description: 'Google Trends 地區'
+        required: false
+        type: string
+        default: 'TW'
+      publish:
+        description: '是否真的發布（false = 全平台 dry-run 測試）'
+        required: false
+        type: string
+        default: 'true'
+
+jobs:
+  auto:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install ffmpeg + CJK fonts + biliup
+        run: |
+          sudo apt-get update && sudo apt-get install -y ffmpeg fonts-noto-cjk fontconfig && sudo fc-cache -f
+          curl -sL https://github.com/biliup/biliup-rs/releases/download/v0.2.4/biliupR-v0.2.4-x86_64-linux.tar.xz -o /tmp/biliup.tar.xz
+          tar -xf /tmp/biliup.tar.xz -C /tmp
+          sudo install -m 755 "$(find /tmp -maxdepth 2 -name biliup -type f | head -n1)" /usr/local/bin/biliup
+      - name: Install Python deps
+        run: pip install -r requirements.txt google-api-python-client google-auth google-auth-oauthlib
+
+      - name: 1) Pick trending topic
+        id: topic
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          if [ -n "${{ inputs.topic }}" ]; then
+            echo "${{ inputs.topic }}" > topic.txt
+          else
+            python scripts/trending_topic.py --geo "${{ inputs.geo || 'TW' }}" --output topic.txt >/dev/null
+          fi
+          echo "topic=$(cat topic.txt)" >> "$GITHUB_OUTPUT"
+          echo "Topic: $(cat topic.txt)"
+
+      - name: 2) Generate long-form script (+ title/desc/tags)
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: python scripts/generate_longform.py --topic "$(cat topic.txt)" --minutes ${{ inputs.minutes || '10' }} --output scenes.json
+
+      - name: 3) Per-scene TTS + photorealistic backgrounds (720p)
+        run: python scripts/generate_scene_assets.py --scenes scenes.json --voice zh-TW-HsiaoChenNeural --workdir build --width 1280 --height 720
+
+      - name: 4) Assemble 720p@15fps (static bg + random transitions + subs)
+        run: python scripts/assemble_longform.py --manifest build/manifest.json --output output/final_video.mp4 --fps 15 --transition 0.8 --font "Noto Sans CJK TC"
+
+      - name: 5a) Publish to YouTube
+        env:
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+        run: python scripts/upload_youtube.py --video output/final_video.mp4 --title "$(cat title.txt)" --description "$(cat description.txt)" --tags "$(cat tags.txt)"
+
+      - name: 5b) Publish to TikTok
+        env:
+          TIKTOK_ACCESS_TOKEN: ${{ secrets.TIKTOK_ACCESS_TOKEN }}
+        run: python scripts/upload_tiktok.py --video output/final_video.mp4 --title "$(cat title.txt)" --description "$(cat description.txt)" --tags "$(cat tags.txt)"
+
+      - name: 5c) Publish to Bilibili
+        env:
+          BILIBILI_COOKIES_CONTENT: ${{ secrets.BILIBILI_COOKIES }}
+          BILIBILI_TID: ${{ vars.BILIBILI_TID }}
+        run: |
+          if [ "${{ inputs.publish }}" != "false" ] && [ -n "$BILIBILI_COOKIES_CONTENT" ]; then
+            printf '%s' "$BILIBILI_COOKIES_CONTENT" > "$RUNNER_TEMP/bili_cookies.json"
+            export BILIBILI_COOKIES="$RUNNER_TEMP/bili_cookies.json"
+          fi
+          python scripts/upload_bilibili.py --video output/final_video.mp4 --title "$(cat title.txt)" --description "$(cat description.txt)" --tags "$(cat tags.txt)"
+
+      - name: 6) Notify Discord
+        if: always()
+        env:
+          WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        run: |
+          if [ -n "$WEBHOOK" ]; then
+            curl -s -H "Content-Type: application/json" \
+              -d "{\"content\":\"🎬 每日自動影片完成並發布：$(cat title.txt 2>/dev/null)\"}" "$WEBHOOK"
+          fi
+
+      - name: Upload artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-video
+          path: |
+            output/final_video.mp4
+            scenes.json
+            topic.txt
+          retention-days: 7

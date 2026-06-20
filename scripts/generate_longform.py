@@ -117,6 +117,19 @@ def main() -> int:
     data["topic"] = args.topic
     with open(args.output, "w", encoding="utf-8") as fh:
         json.dump(data, fh, ensure_ascii=False, indent=2)
+
+    # Publish metadata (consumed by upload_*.py via the workflow)
+    title = data.get("title", "AI 影片")
+    topic_disp = args.topic if args.topic not in ("", "auto") else title
+    with open("title.txt", "w", encoding="utf-8") as fh:
+        fh.write(title)
+    with open("description.txt", "w", encoding="utf-8") as fh:
+        fh.write(f"{title}\n\n本片主題：{topic_disp}。由 AI 每日自動生成（腳本/配音/畫面）。")
+    words = [w for w in re.split(r"[：:，,、\s]+", title) if 2 <= len(w) <= 8][:4]
+    tags = ",".join(dict.fromkeys(words + ["AI", "知識", "科普", "每日更新"]))
+    with open("tags.txt", "w", encoding="utf-8") as fh:
+        fh.write(tags)
+
     chars = sum(len(s["narration"]) for s in data["scenes"])
     print(f"[ok] wrote {args.output}: title={data.get('title')!r}, scenes={len(data['scenes'])}, "
           f"~{chars} chars (~{chars * 60 // 215}s)")
