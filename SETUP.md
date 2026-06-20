@@ -2,13 +2,14 @@
 
 所有設定都在 **repo → Settings → Secrets and variables → Actions → New repository secret**。
 
-## 1. LLM（腳本/摘要品質）— 擇一
-| Secret | 取得 |
-|--------|------|
-| `ANTHROPIC_API_KEY` | console.anthropic.com（模型預設 `claude-opus-4-8`，與 Claude Code 同款；省成本可設 `ANTHROPIC_MODEL=claude-sonnet-4-6`）|
-| `OPENAI_API_KEY` | platform.openai.com（預設 `gpt-4o`）|
+## 1. LLM（腳本/摘要品質）— 擇一，優先序 DeepSeek → Claude → OpenAI
+| Secret | 取得 | 模型預設 |
+|--------|------|---------|
+| `DEEPSEEK_API_KEY`（優先採用）| platform.deepseek.com | `deepseek-v4-flash`（可用 `DEEPSEEK_MODEL` 覆寫）|
+| `ANTHROPIC_API_KEY` | console.anthropic.com | `claude-opus-4-8`（可設 `ANTHROPIC_MODEL`）|
+| `OPENAI_API_KEY` | platform.openai.com | `gpt-4o` |
 
-兩者皆未設 → 腳本用內建離線範本（流程能跑，但內容是範本）。
+全未設 → 腳本用內建離線範本（流程能跑，但內容是範本）。DeepSeek 走 OpenAI 相容 API（`https://api.deepseek.com`），不需額外套件（已用 openai SDK）。
 
 ## 2. TTS — 免費，無需設定
 edge-tts 不需金鑰。想要台灣口音可在觸發 workflow 時把 voice 改成 `zh-TW-HsiaoChenNeural`。

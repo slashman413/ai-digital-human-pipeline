@@ -26,7 +26,7 @@
                  ┌──────────────── GitHub Actions（排程 + 編排）────────────────┐
   schedule /     │                                                              │
   workflow_dispatch ─► generate-content ─► compose-video ─► publish (matrix)    │
-                 │   (Claude腳本+edge-tts)  (Whisper字幕+FFmpeg)   ├─ YouTube    │
+                 │  (DeepSeek腳本+edge-tts) (Whisper字幕+FFmpeg)   ├─ YouTube    │
                  │                                                ├─ TikTok     │
                  │                                                └─ Bilibili   │
                  │                                                    │         │
@@ -36,12 +36,12 @@
 
 | 階段 | 腳本 | Runner | 需要 |
 |------|------|--------|------|
-| 腳本生成 | `scripts/generate_script.py`（LLM=Claude）| hosted (CPU) | `ANTHROPIC_API_KEY`（可無，用範本）|
+| 腳本生成 | `scripts/generate_script.py`（LLM=DeepSeek V4 Flash）| hosted (CPU) | `DEEPSEEK_API_KEY`（可無，用範本）|
 | 語音 TTS | `scripts/generate_tts.py` | hosted (CPU) | 無（edge-tts 免費）|
 | 字幕 | `scripts/generate_subtitles.py` | hosted (CPU) | 無（Whisper tiny）|
 | 影片合成 | FFmpeg（workflow 內）| hosted (CPU) | 無 |
 | 發布 | `upload_youtube.py` / `upload_tiktok.py` / `upload_bilibili.py` | hosted (CPU) | 各平台憑證（缺則 dry-run）|
-| 摘要選題 | `scripts/fetch_daily_digest.py` `script_from_digest.py` | hosted (CPU) | `ANTHROPIC_API_KEY`（可無）|
+| 摘要選題 | `scripts/fetch_daily_digest.py` `script_from_digest.py` | hosted (CPU) | `DEEPSEEK_API_KEY`（可無）|
 
 ## 📁 結構
 
@@ -51,7 +51,7 @@ ai-digital-human-pipeline/
 │   ├── content-pipeline.yml   # 主產線：腳本→TTS→字幕→合成→多平台發布→通知
 │   └── daily-digest.yml       # 每日選題：熱點→摘要→腳本草稿
 ├── scripts/                    # 全部可獨立 CLI 執行
-│   ├── llm.py                  # 共用 LLM 呼叫（Claude/OpenAI/離線範本）
+│   ├── llm.py                  # 共用 LLM 呼叫（DeepSeek/Claude/OpenAI/離線範本）
 │   ├── generate_script.py  generate_tts.py  generate_subtitles.py
 │   ├── fetch_daily_digest.py  script_from_digest.py
 │   ├── upload_youtube.py  upload_tiktok.py  upload_bilibili.py
