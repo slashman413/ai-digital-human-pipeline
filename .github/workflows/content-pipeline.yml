@@ -148,14 +148,27 @@ jobs:
           if [ "${{ matrix.platform }}" = "youtube" ]; then
             pip install google-api-python-client google-auth google-auth-oauthlib
           fi
+          if [ "${{ matrix.platform }}" = "bilibili" ]; then
+            curl -sL https://github.com/biliup/biliup-rs/releases/download/v0.2.4/biliupR-v0.2.4-x86_64-linux.tar.xz -o /tmp/biliup.tar.xz
+            tar -xf /tmp/biliup.tar.xz -C /tmp
+            BIN=$(find /tmp -maxdepth 2 -name biliup -type f | head -n1)
+            sudo install -m 755 "$BIN" /usr/local/bin/biliup
+            biliup --version || true
+          fi
       - name: Publish to ${{ matrix.platform }}
         env:
           YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
           TIKTOK_ACCESS_TOKEN: ${{ secrets.TIKTOK_ACCESS_TOKEN }}
-          BILIBILI_COOKIES: ${{ secrets.BILIBILI_COOKIES }}
+          # Bilibili cookie JSON is stored as a secret; we materialize it to a file.
+          BILIBILI_COOKIES_CONTENT: ${{ secrets.BILIBILI_COOKIES }}
+          BILIBILI_TID: ${{ vars.BILIBILI_TID }}
         run: |
+          if [ "${{ matrix.platform }}" = "bilibili" ] && [ -n "$BILIBILI_COOKIES_CONTENT" ]; then
+            printf '%s' "$BILIBILI_COOKIES_CONTENT" > "$RUNNER_TEMP/bili_cookies.json"
+            export BILIBILI_COOKIES="$RUNNER_TEMP/bili_cookies.json"
+          fi
           python scripts/upload_${{ matrix.platform }}.py \
             --video output/final_video.mp4 \
             --title "$(cat title.txt 2>/dev/null || echo 'AI 數字人影片')" \
