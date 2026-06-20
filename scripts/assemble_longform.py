@@ -1,21 +1,30 @@
-"""Assemble scene segments into one 480p@30fps video with:
-  - Ken Burns motion (slow zoom in/out + center pan) on each still background
-  - Crossfade transitions between scenes (xfade + acrossfade)
+"""Assemble scene segments into one 480p video with:
+  - Static backgrounds (no Ken Burns / zoom — that caused visible jitter)
+  - A RANDOM, natural transition between every scene (xfade + acrossfade)
   - Time-synced burned-in subtitles (timeline adjusted for transition overlaps)
 
 Reads <workdir>/manifest.json (from generate_scene_assets.py).
 
 CLI: --manifest build/manifest.json --output output/final_video.mp4
-     --fps 30 --transition 0.6 --font "Noto Sans CJK TC"
+     --fps 15 --transition 0.8 --font "Noto Sans CJK TC" --seed 0
 """
 from __future__ import annotations
 
 import argparse
 import json
 import os
+import random
 import subprocess
 import re
 import sys
+
+# Natural, non-gimmicky xfade transitions to pick from at random.
+TRANSITIONS = [
+    "fade", "dissolve", "fadeblack",
+    "smoothleft", "smoothright", "smoothup", "smoothdown",
+    "wipeleft", "wiperight", "wipeup", "wipedown",
+    "slideleft", "slideright", "circleopen", "radial",
+]
 
 
 def run(cmd: list[str]) -> None:
@@ -68,29 +77,16 @@ def build_srt(scenes: list[dict], starts: list[float], total: float, path: str) 
             fh.write(f"{i}\n{srt_time(a)} --> {srt_time(b)}\n{txt}\n\n")
 
 
-def kenburns_vf(idx: int, frames: int, w: int, h: int, fps: int) -> str:
-    """Alternate slow zoom-in / zoom-out, centered. Pre-upscale for smoothness."""
-    rate = 0.16 / max(frames, 1)
-    if idx % 2 == 0:
-        z = f"min(1.0+{rate:.6f}*on,1.16)"
-    else:
-        z = f"max(1.16-{rate:.6f}*on,1.0)"
-    return (
-        f"scale={w*2}:{h*2},"
-        f"zoompan=z='{z}':d={frames}:"
-        f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={w}x{h}:fps={fps},"
-        f"setsar=1"
-    )
-
-
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--manifest", default="build/manifest.json")
     ap.add_argument("--output", default="output/final_video.mp4")
-    ap.add_argument("--fps", type=int, default=30)
-    ap.add_argument("--transition", type=float, default=0.6)
+    ap.add_argument("--fps", type=int, default=15)
+    ap.add_argument("--transition", type=float, default=0.8)
     ap.add_argument("--font", default="Noto Sans CJK TC")
+    ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()
+    rng = random.Random(args.seed)
 
     with open(args.manifest, encoding="utf-8") as fh:
         m = json.load(fh)
@@ -105,21 +101,19 @@ def main() -> int:
     if T > min_dur / 2:
         T = round(max(0.2, min_dur / 3), 2)
 
-    # 1) per-scene segment with Ken Burns motion
+    # 1) per-scene segment: STATIC background (no zoom/jitter), scaled to WxH@fps
     seg_paths = []
     for i, sc in enumerate(scenes):
         d = float(sc["duration"])
         seg = os.path.join(workdir, f"seg_{i:02d}.mp4")
-        frames = int(round(d * fps)) + fps  # a little extra so zoompan covers full audio
         run([
             "ffmpeg", "-y", "-loop", "1", "-i", sc["image"], "-i", sc["audio"],
-            "-filter_complex", f"[0:v]{kenburns_vf(i, frames, w, h, fps)}[v]",
-            "-map", "[v]", "-map", "1:a",
-            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", str(fps), "-t", f"{d:.3f}",
+            "-vf", f"scale={w}:{h},fps={fps},setsar=1,format=yuv420p",
+            "-c:v", "libx264", "-tune", "stillimage", "-r", str(fps), "-t", f"{d:.3f}",
             "-c:a", "aac", "-b:a", "128k", "-shortest", seg,
         ])
         seg_paths.append(seg)
-        print(f"[ok] segment {i:02d} (kenburns {'in' if i%2==0 else 'out'})")
+        print(f"[ok] segment {i:02d} (static)")
 
     # scene start times in the crossfaded timeline + total duration
     durs = [float(s["duration"]) for s in scenes]
@@ -148,7 +142,8 @@ def main() -> int:
             offset = sum(durs[:i]) - i * T
             vout = f"[vx{i}]"
             aout = f"[ax{i}]"
-            vchain.append(f"{vprev}[{i}:v]xfade=transition=fade:duration={T}:offset={offset:.3f}{vout}")
+            trans = rng.choice(TRANSITIONS)  # random, natural transition per switch
+            vchain.append(f"{vprev}[{i}:v]xfade=transition={trans}:duration={T}:offset={offset:.3f}{vout}")
             achain.append(f"{aprev}[{i}:a]acrossfade=d={T}{aout}")
             vprev, aprev = vout, aout
         # burn subtitles on the final crossfaded video
@@ -162,7 +157,7 @@ def main() -> int:
             "-c:a", "aac", "-b:a", "128k", args.output,
         ])
     print(f"[ok] wrote {args.output}: {n} scenes, ~{total:.0f}s @ {w}x{h}/{fps}fps, "
-          f"kenburns+xfade(T={T}s)")
+          f"static bg + random transitions (T={T}s)")
     return 0
 
 

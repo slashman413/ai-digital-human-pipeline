@@ -46,8 +46,8 @@ jobs:
       - name: 2) Per-scene TTS + background images
         run: python scripts/generate_scene_assets.py --scenes scenes.json --voice "${{ inputs.voice || 'zh-TW-HsiaoChenNeural' }}" --workdir build --width 854 --height 480
 
-      - name: 3) Assemble 480p@30fps with switching backgrounds + subtitles
-        run: python scripts/assemble_longform.py --manifest build/manifest.json --output output/final_video.mp4 --fps 30 --font "Noto Sans CJK TC"
+      - name: 3) Assemble 480p@15fps, static backgrounds + random transitions + subtitles
+        run: python scripts/assemble_longform.py --manifest build/manifest.json --output output/final_video.mp4 --fps 15 --transition 0.8 --font "Noto Sans CJK TC"
 
       - name: Upload video
         uses: actions/upload-artifact@v4

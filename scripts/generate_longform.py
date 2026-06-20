@@ -88,10 +88,11 @@ def main() -> int:
     ap.add_argument("--output", default="scenes.json")
     args = ap.parse_args()
 
-    # ~1 scene per ~40s. The writer tends to produce ~200 zh chars/scene (~40s TTS),
-    # so minutes*1.5 scenes lands near the target length.
-    scenes = args.scenes if args.scenes > 0 else max(6, round(args.minutes * 1.5))
-    per_chars = max(120, args.minutes * 300 // scenes)  # ~300 spoken zh chars/min
+    # Measured: zh-TW edge-tts speaks ~215 chars/min (~0.28s per char).
+    # ~12 scenes for a 10-min video → ~179 chars (~50s) each.
+    CHARS_PER_MIN = 215
+    scenes = args.scenes if args.scenes > 0 else max(4, round(args.minutes * 1.2))
+    per_chars = max(120, args.minutes * CHARS_PER_MIN // scenes)
 
     try:
         ol = outline(args.topic, scenes)
@@ -117,7 +118,7 @@ def main() -> int:
         json.dump(data, fh, ensure_ascii=False, indent=2)
     chars = sum(len(s["narration"]) for s in data["scenes"])
     print(f"[ok] wrote {args.output}: title={data.get('title')!r}, scenes={len(data['scenes'])}, "
-          f"~{chars} chars (~{chars // 300} min)")
+          f"~{chars} chars (~{chars * 60 // 215}s)")
     return 0
 
 
