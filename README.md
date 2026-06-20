@@ -20,43 +20,42 @@
 
 ## 🧩 架構
 
+數字人採「**圖文影片**」(背景 + 字幕 + 語音)，不做真人臉口型同步 → 全程純 CPU、免費 runner、無需 GPU。
+
 ```
-                 ┌──────────── GitHub Actions（排程 + 編排）────────────┐
-  schedule /     │                                                      │
-  workflow_dispatch ─►  generate-content ─► compose-video ─► publish    │
-                 │   (LLM腳本+edge-tts)    (Whisper字幕+FFmpeg)  (YouTube)│
-                 │                              │                        │
-                 │                              ▼                        │
-                 │                       gpu-processing  ◄── self-hosted │
-                 │                       (Wav2Lip 口型同步, 你的 GPU)     │
-                 │                              │                        │
-                 │                           notify (Discord)            │
-                 └──────────────────────────────────────────────────────┘
+                 ┌──────────────── GitHub Actions（排程 + 編排）────────────────┐
+  schedule /     │                                                              │
+  workflow_dispatch ─► generate-content ─► compose-video ─► publish (matrix)    │
+                 │   (Claude腳本+edge-tts)  (Whisper字幕+FFmpeg)   ├─ YouTube    │
+                 │                                                ├─ TikTok     │
+                 │                                                └─ Bilibili   │
+                 │                                                    │         │
+                 │                                                 notify(Discord)│
+                 └──────────────────────────────────────────────────────────────┘
 ```
 
 | 階段 | 腳本 | Runner | 需要 |
 |------|------|--------|------|
-| 腳本生成 | `scripts/generate_script.py` | hosted (CPU) | LLM key（可無，用範本）|
+| 腳本生成 | `scripts/generate_script.py`（LLM=Claude）| hosted (CPU) | `ANTHROPIC_API_KEY`（可無，用範本）|
 | 語音 TTS | `scripts/generate_tts.py` | hosted (CPU) | 無（edge-tts 免費）|
 | 字幕 | `scripts/generate_subtitles.py` | hosted (CPU) | 無（Whisper tiny）|
 | 影片合成 | FFmpeg（workflow 內）| hosted (CPU) | 無 |
-| 口型同步 | `scripts/wav2lip_process.py` | **self-hosted GPU** | 你的 Windows GPU + Wav2Lip |
-| 發布 | `scripts/upload_youtube.py` | hosted (CPU) | YouTube OAuth |
-| 摘要選題 | `scripts/fetch_daily_digest.py` `script_from_digest.py` | hosted (CPU) | LLM key（可無）|
+| 發布 | `upload_youtube.py` / `upload_tiktok.py` / `upload_bilibili.py` | hosted (CPU) | 各平台憑證（缺則 dry-run）|
+| 摘要選題 | `scripts/fetch_daily_digest.py` `script_from_digest.py` | hosted (CPU) | `ANTHROPIC_API_KEY`（可無）|
 
 ## 📁 結構
 
 ```
 ai-digital-human-pipeline/
 ├── .github/workflows/
-│   ├── content-pipeline.yml   # 主產線：腳本→TTS→字幕→合成→發布→通知
-│   ├── daily-digest.yml       # 每日選題：熱點→摘要→腳本草稿
-│   └── gpu-processing.yml      # 觸發本機 GPU 做口型同步
+│   ├── content-pipeline.yml   # 主產線：腳本→TTS→字幕→合成→多平台發布→通知
+│   └── daily-digest.yml       # 每日選題：熱點→摘要→腳本草稿
 ├── scripts/                    # 全部可獨立 CLI 執行
-│   ├── llm.py                  # 共用 LLM 呼叫（Anthropic/OpenAI/離線範本）
+│   ├── llm.py                  # 共用 LLM 呼叫（Claude/OpenAI/離線範本）
 │   ├── generate_script.py  generate_tts.py  generate_subtitles.py
 │   ├── fetch_daily_digest.py  script_from_digest.py
-│   ├── upload_youtube.py  wav2lip_process.py
+│   ├── upload_youtube.py  upload_tiktok.py  upload_bilibili.py
+├── samples/sample_script.md    # Claude 親自撰寫的示範稿
 ├── config/pipeline.example.yaml
 ├── assets/                     # background.png / avatar.png（沒放會自動生成佔位圖）
 ├── requirements.txt   .env.example

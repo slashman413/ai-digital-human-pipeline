@@ -121,27 +121,17 @@ jobs:
             description.txt
             tags.txt
 
-  # ===== Job 3：本機 GPU 口型同步（self-hosted，預設關閉）=====
-  gpu-processing:
-    needs: compose-video
-    runs-on: [self-hosted, windows, gpu]
-    if: false   # 設好 self-hosted runner 後改成 true（或用 vars.ENABLE_GPU）
-    steps:
-      - uses: actions/checkout@v4
-      - name: Download final video
-        uses: actions/download-artifact@v4
-        with:
-          name: final-video
-      - name: Wav2Lip lip-sync (GPU)
-        env:
-          WAV2LIP_DIR: ${{ secrets.WAV2LIP_DIR }}
-        run: python scripts/wav2lip_process.py --video output/final_video.mp4 --audio audio/voice.mp3 --output output/talking_head.mp4
-
-  # ===== Job 4：發布 YouTube（手動勾選或排程時）=====
+  # ===== Job 3：多平台發布（YouTube + TikTok + Bilibili 平行）=====
+  # 數字人採「圖文影片」(背景+字幕+語音)，不需 GPU 口型同步。
+  # 每個平台缺憑證時自動 dry-run，不會讓流程失敗。
   publish:
     needs: compose-video
     runs-on: ubuntu-latest
     if: ${{ inputs.publish == true || github.event_name == 'schedule' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [youtube, tiktok, bilibili]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -151,20 +141,27 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: final-video
-      - name: Upload to YouTube (dry-run if no creds)
+      - name: Install publisher deps
+        run: |
+          pip install requests
+          if [ "${{ matrix.platform }}" = "youtube" ]; then
+            pip install google-api-python-client google-auth google-auth-oauthlib
+          fi
+      - name: Publish to ${{ matrix.platform }}
         env:
           YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          TIKTOK_ACCESS_TOKEN: ${{ secrets.TIKTOK_ACCESS_TOKEN }}
+          BILIBILI_COOKIES: ${{ secrets.BILIBILI_COOKIES }}
         run: |
-          pip install google-api-python-client google-auth google-auth-oauthlib
-          python scripts/upload_youtube.py \
+          python scripts/upload_${{ matrix.platform }}.py \
             --video output/final_video.mp4 \
             --title "$(cat title.txt 2>/dev/null || echo 'AI 數字人影片')" \
             --description "$(cat description.txt 2>/dev/null || echo '由 GitHub Actions 自動產生')" \
             --tags "$(cat tags.txt 2>/dev/null || echo 'AI,數字人')"
 
-  # ===== Job 5：通知 =====
+  # ===== Job 4：通知 =====
   notify:
     needs: [compose-video, publish]
     runs-on: ubuntu-latest

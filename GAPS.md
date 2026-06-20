@@ -1,30 +1,31 @@
 # 還缺什麼 / 需要你提供的東西（GAPS）
 
-repo 本身已經**可以跑完整條流程**（缺 key 時自動降級）。要把它變成「全自動、產出真實 AI 內容並發布」，還需要以下決策與資料。我把它分成「必要」「依需求」「未來擴充」。
+repo 本身已經**可以跑完整條流程**（缺憑證時自動降級 dry-run，不會失敗）。
 
-## A. 必要（要真實內容，至少給其一/其二）
-1. **LLM API key** — `ANTHROPIC_API_KEY` 或 `OPENAI_API_KEY`。沒有的話腳本只會輸出範本文字。
-2. **發布平台帳號** — 若要自動上 YouTube，需要 OAuth 三件組（client id / secret / refresh token，見 SETUP.md §3）。
+## ✅ 已定案（依你 2026-06-20 的決定）
+1. **數字人形式 = 圖文影片**（背景 + 字幕 + 語音），不做真人臉 → 已移除 GPU/Wav2Lip 路徑，不需 self-hosted runner。
+2. **LLM = Claude**（Anthropic，預設 `claude-sonnet-4-6`；`scripts/llm.py`）。
+3. **發布平台 = YouTube + TikTok + Bilibili** → 已實作三個 uploader，`publish` job 以 matrix 平行發布。
 
-## B. 依需求（看你要做到哪一步）
-3. **數字人「臉」要怎麼來？** 三選一，影響成本與是否需要 GPU：
-   - 本機 GPU + Wav2Lip/SadTalker（免費、最靈活，需註冊 self-hosted runner + 下載模型權重 `wav2lip_gan.pth`）。
-   - 雲端 API（HeyGen / D-ID / Synthesia）——最簡單、純 API，但要付費 + 申請 key（目前 repo 尚未實作這條，需要你決定要哪家我再接）。
-   - 不要真人臉，只用「背景 + 字幕 + 語音」的圖文影片（現在預設就是這種，零成本）。
-4. **TTS 等級** — 免費 edge-tts（已可用）vs 付費 ElevenLabs/Azure（情感、語音克隆）。要升級請給對應 key + 指定語音。
-5. **素材** — 品牌背景圖、頭像圖、片頭/片尾、背景音樂（放 `assets/`）。沒有就用佔位純色背景。
-6. **目標語言/口音** — 預設 zh-TW 腳本 + `zh-CN-XiaoxiaoNeural` 語音；台灣口音可換 `zh-TW-HsiaoChenNeural`；要多語版本再說。
+## 🔑 還需要你提供的「憑證」（給了才會真的發出去/用真 AI 生成）
+全部設在 repo → Settings → Secrets and variables → Actions。任一缺少 → 該部分自動 dry-run。
 
-## C. 未來擴充（研究有提到、目前未實作）
-7. **多平台發布** — 目前只實作 YouTube；Bilibili / TikTok / Shorts 需各自的 API 與授權。
-8. **語音克隆 / 情感語音**（GPT-SoVITS、FishSpeech）— 需 GPU self-hosted。
-9. **去背 / 綠幕、即時表情**（MuseTalk）— 需 GPU。
-10. **績效儀表板** — 把 YouTube/B站分析數據收集後用 GitHub Pages 視覺化（研究有規劃，可再做一個 dashboard）。
-11. **A/B 測試 / 異常監控 / 品質檢查** — 研究列出的進階面向，可後續加。
+| 用途 | Secret | 沒給的後果 |
+|------|--------|-----------|
+| Claude 生成腳本（雲端自動） | `ANTHROPIC_API_KEY` | 用離線範本（內容是範本，非 AI 生成）|
+| YouTube 發布 | `YOUTUBE_CLIENT_ID` / `_SECRET` / `_REFRESH_TOKEN` | YouTube dry-run |
+| TikTok 發布 | `TIKTOK_ACCESS_TOKEN` | TikTok dry-run |
+| Bilibili 發布 | `BILIBILI_COOKIES`（+ runner 裝 biliup）| Bilibili dry-run |
+| Discord 通知 | `DISCORD_WEBHOOK` | 略過通知 |
 
-## D. 我需要你回覆的關鍵 3 個問題
-1. **數字人要不要真人臉？** → 不要(圖文影片) / 本機 GPU Wav2Lip / 雲端 API（哪家？）
-2. **LLM 用哪個？** → 給我 Anthropic 還是 OpenAI 的 key（或先用範本）
-3. **發布到哪？** → 先只做 YouTube，還是要含 Bilibili/TikTok？
+## 📌 關於「你自己就是 LLM」
+腳本生成就是用 Claude。兩種運作方式：
+- **A. 雲端全自動**：設 `ANTHROPIC_API_KEY` 一個 secret，GitHub Actions 排程時自動呼叫 Claude 寫腳本（最省事、24h 自動）。
+- **B. 我在這邊先寫好**：我（Claude Code）直接在對話這側產生腳本並 commit 進 repo，workflow 只做 TTS+合成+發布。完全不用任何 key，但需要我被觸發來補稿（非 24h 全自動）。
+> 我已放一支我親自寫的示範腳本在 `samples/sample_script.md`，示範 B 模式的產出品質。你選 A 或 B 跟我說即可。
 
-回了這三個，我就能把它從「能跑的骨架」收斂成「符合你需求的全自動產線」。
+## 🧩 未來可加（目前未做）
+- 多語版本（自動翻譯 + 多語 TTS + 字幕）
+- 績效儀表板（YouTube/B站 數據 → GitHub Pages 視覺化）
+- A/B 測試、品質檢查、異常監控與降級
+- 升級 TTS（ElevenLabs/Azure 情感語音）
