@@ -53,6 +53,30 @@ def fetch_trends(geo: str) -> list[str]:
     return [t for t in (it.findtext("title") for it in root.iter("item")) if t]
 
 
+def youtube_trending(region: str, max_results: int = 40) -> list[str]:
+    """Titles of currently-trending YouTube videos (Data API, via the OAuth creds)."""
+    import json as _json
+    import urllib.parse as _up
+
+    cid = os.getenv("YOUTUBE_CLIENT_ID"); cs = os.getenv("YOUTUBE_CLIENT_SECRET")
+    rt = os.getenv("YOUTUBE_REFRESH_TOKEN")
+    if not (cid and cs and rt):
+        raise RuntimeError("no YouTube OAuth creds")
+    tok_req = urllib.request.Request(
+        "https://oauth2.googleapis.com/token",
+        data=_up.urlencode({"client_id": cid, "client_secret": cs,
+                            "refresh_token": rt, "grant_type": "refresh_token"}).encode(),
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    token = _json.loads(urllib.request.urlopen(tok_req, timeout=30).read())["access_token"]
+    q = _up.urlencode({"part": "snippet", "chart": "mostPopular",
+                       "regionCode": region, "maxResults": max_results})
+    vreq = urllib.request.Request(f"https://www.googleapis.com/youtube/v3/videos?{q}",
+                                  headers={"Authorization": f"Bearer {token}"})
+    data = _json.loads(urllib.request.urlopen(vreq, timeout=30).read())
+    return [it["snippet"]["title"] for it in data.get("items", []) if it.get("snippet", {}).get("title")]
+
+
 def frame_topic(trend: str) -> str:
     sys_p = "你是內容企劃。只輸出一句繁體中文的影片主題，不要解釋、不要引號。"
     user = (
@@ -78,18 +102,30 @@ def frame_topic(trend: str) -> str:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--geo", default="TW")
+    ap.add_argument("--source", default="youtube", choices=["youtube", "trends"],
+                    help="topic source: YouTube trending videos (default) or Google Trends")
     ap.add_argument("--output", default="topic.txt")
     args = ap.parse_args()
 
     trends: list[str] = []
-    for geo in [args.geo, "US"]:
+    # primary: random pick from YouTube trending video titles
+    if args.source == "youtube":
         try:
-            trends = fetch_trends(geo)
+            trends = youtube_trending(args.geo)
             if trends:
-                print(f"[trending] {len(trends)} trends from geo={geo}")
-                break
+                print(f"[trending] {len(trends)} titles from YouTube trending (geo={args.geo})")
         except Exception as e:  # noqa: BLE001
-            print(f"[warn] trends fetch failed for {geo}: {e}")
+            print(f"[warn] YouTube trending failed ({e}); falling back to Google Trends.")
+    # fallback: Google Trends RSS
+    if not trends:
+        for geo in [args.geo, "US"]:
+            try:
+                trends = fetch_trends(geo)
+                if trends:
+                    print(f"[trending] {len(trends)} trends from Google Trends geo={geo}")
+                    break
+            except Exception as e:  # noqa: BLE001
+                print(f"[warn] trends fetch failed for {geo}: {e}")
     safe_trends = [t for t in trends if not is_sensitive(t)]
     if len(safe_trends) < len(trends):
         print(f"[trending] filtered out {len(trends) - len(safe_trends)} sensitive trend(s)")

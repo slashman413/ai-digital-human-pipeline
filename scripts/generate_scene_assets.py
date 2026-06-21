@@ -43,6 +43,20 @@ def ffprobe_duration(path: str) -> float:
         return 4.0  # safe fallback
 
 
+def ffprobe_duration_strict(path: str) -> float:
+    """Like ffprobe_duration but returns 0.0 (not a fallback) on any error —
+    used to detect a corrupt/empty audio file that must be regenerated."""
+    try:
+        out = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "default=nw=1:nk=1", path],
+            capture_output=True, text=True, check=True,
+        )
+        return float(out.stdout.strip())
+    except Exception:
+        return 0.0
+
+
 async def tts(text: str, voice: str, out_path: str) -> None:
     import edge_tts
 
@@ -86,6 +100,8 @@ def main() -> int:
     ap.add_argument("--workdir", default="build")
     ap.add_argument("--width", type=int, default=1920)
     ap.add_argument("--height", type=int, default=1080)
+    ap.add_argument("--reuse-images-from", default="",
+                    help="reuse img_NN.jpg from this dir (e.g. the zh build) instead of generating")
     args = ap.parse_args()
 
     os.makedirs(args.workdir, exist_ok=True)
@@ -98,14 +114,31 @@ def main() -> int:
         audio = os.path.join(args.workdir, f"audio_{i:02d}.mp3")
         image = os.path.join(args.workdir, f"img_{i:02d}.jpg")
         narration = sc.get("narration", "").strip()
-        try:
-            asyncio.run(tts(narration, args.voice, audio))
-        except Exception as e:  # noqa: BLE001
-            print(f"[warn] TTS failed on scene {i} ({e}); silent 4s.")
+        # TTS with validation + retry (edge-tts can write a corrupt/empty mp3 without raising)
+        audio_ready = False
+        for attempt in range(3):
+            try:
+                if os.path.isfile(audio):
+                    os.remove(audio)
+                asyncio.run(tts(narration, args.voice, audio))
+                if os.path.isfile(audio) and os.path.getsize(audio) > 1200 and ffprobe_duration_strict(audio) > 0.3:
+                    audio_ready = True
+                    break
+                print(f"[warn] scene {i} TTS produced invalid audio (attempt {attempt + 1}); retrying.")
+            except Exception as e:  # noqa: BLE001
+                print(f"[warn] TTS attempt {attempt + 1} scene {i} failed ({e}).")
+            time.sleep(2)
+        if not audio_ready:
+            print(f"[warn] scene {i} audio still invalid; using silent fallback.")
             subprocess.run(["ffmpeg", "-y", "-f", "lavfi", "-i",
-                            "anullsrc=r=24000:cl=mono", "-t", "4", audio], capture_output=True)
-        if not fetch_image(sc.get("image_prompt", "abstract background"), image,
-                           args.width, args.height, seed=1000 + i):
+                            "anullsrc=r=24000:cl=mono", "-t", "6", audio], capture_output=True)
+        reuse_src = os.path.join(args.reuse_images_from, f"img_{i:02d}.jpg") if args.reuse_images_from else ""
+        if reuse_src and os.path.isfile(reuse_src) and os.path.getsize(reuse_src) > 1000:
+            import shutil
+            shutil.copyfile(reuse_src, image)
+            print(f"[reuse] scene {i} image from {reuse_src}")
+        elif not fetch_image(sc.get("image_prompt", "abstract background"), image,
+                             args.width, args.height, seed=1000 + i):
             print(f"[warn] image gen failed on scene {i}; using placeholder.")
             placeholder_image(image, args.width, args.height, i)
         dur = ffprobe_duration(audio)

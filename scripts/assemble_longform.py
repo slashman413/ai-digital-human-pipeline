@@ -56,21 +56,37 @@ def strip_punct(s: str) -> str:
     return re.sub(r"\s+", " ", "".join(out)).strip()
 
 
-def split_chunks(text: str, max_len: int = 20) -> list[str]:
-    parts = re.split(r"(?<=[。！？!?，,、；;])", text)
-    chunks, cur = [], ""
-    for p in parts:
-        p = p.strip()
+def _wrap(s: str, limit: int) -> list[str]:
+    """Wrap one line: at word boundaries for space-separated (English), else by char."""
+    if len(s) <= limit:
+        return [s]
+    out: list[str] = []
+    if " " in s:
+        cur = ""
+        for w in s.split(" "):
+            cand = (cur + " " + w).strip()
+            if len(cand) <= limit:
+                cur = cand
+            else:
+                if cur:
+                    out.append(cur)
+                cur = w
+        if cur:
+            out.append(cur)
+    else:
+        out = [s[i:i + limit] for i in range(0, len(s), limit)]
+    return out
+
+
+def split_chunks(text: str, max_len: int = 24) -> list[str]:
+    # split on sentence/clause punctuation (incl. English '.'), then wrap long lines.
+    parts = re.split(r"(?<=[。！？!?，,、；;.])", text)
+    chunks: list[str] = []
+    for p in (x.strip() for x in parts):
         if not p:
             continue
-        if len(cur) + len(p) <= max_len:
-            cur += p
-        else:
-            if cur:
-                chunks.append(cur)
-            cur = p
-    if cur:
-        chunks.append(cur)
+        limit = 42 if re.search(r"[A-Za-z]", p) else max_len  # English lines can be longer
+        chunks.extend(_wrap(p, limit))
     return chunks or [text]
 
 
