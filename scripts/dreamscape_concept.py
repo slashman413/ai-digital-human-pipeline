@@ -22,6 +22,9 @@ PROMPT = (
     "Design ONE short ambient track concept in the style of the YouTube channel 'dreamscape..' "
     "(dark, melancholic, lonely, cinematic, snowy/winter night mood). Strict JSON:\n"
     '{"title":"<2-3 word lowercase melancholic title, e.g. first snow / distant memories>",'
+    '"seo_title":"<a YouTube title: the title + a VARIED descriptive tail using different wording '
+    'each time (mix of: dark/ethereal ambient, for sleep/study/relax/focus, winter/snow/night, '
+    'calm/atmospheric) — must be relevant but NOT a fixed boilerplate; <=80 chars>",'
     '"music_prompt":"<MusicGen prompt: dark atmospheric ambient, slow, ethereal reverb pads, '
     'no drums, plus 2-3 mood words>",'
     '"image_prompts":["<6 distinct dark dreamscape SCENES: snowy cabins, frozen lakes, foggy '
@@ -51,11 +54,20 @@ def parse_json(text: str) -> dict:
     return json.loads(text)
 
 
+SEO_SUFFIXES = [
+    "dark ambient for deep sleep", "ethereal ambient to study & relax",
+    "calm winter ambient music", "atmospheric ambient for sleep & focus",
+    "dreamy dark ambient music", "ambient soundscape to relax & unwind",
+    "snowy night ambient for sleep", "lonely dark ambient to study",
+]
+
+
 def fallback() -> dict:
     rng = random.Random()
     title = rng.choice(FALLBACK_TITLES)
     return {
         "title": title,
+        "seo_title": f"{title} | {rng.choice(SEO_SUFFIXES)}",
         "music_prompt": "ethereal dark ambient, slow, calm, mysterious, emotional, lush reverb pads, dreamy, cinematic, no drums, no percussion",
         "image_prompts": FALLBACK_SCENES,
         "description": (f"{title} — dark ambient music for sleep, study and relaxation.\n\n"
@@ -82,8 +94,15 @@ def main() -> int:
         d = fallback()
 
     o = args.outdir
+    title_l = str(d["title"]).strip().lower()
     with open(os.path.join(o, "title.txt"), "w", encoding="utf-8") as fh:
-        fh.write(str(d["title"]).strip().lower())
+        fh.write(title_l)
+    # varied-but-relevant YouTube title (no fixed boilerplate suffix)
+    seo = str(d.get("seo_title") or "").strip()
+    if not seo or len(seo) < len(title_l) + 3:
+        seo = f"{title_l} | {random.choice(SEO_SUFFIXES)}"
+    with open(os.path.join(o, "yt_title.txt"), "w", encoding="utf-8") as fh:
+        fh.write(seo)
     with open(os.path.join(o, "music_prompt.txt"), "w", encoding="utf-8") as fh:
         fh.write(str(d.get("music_prompt") or fallback()["music_prompt"]))
     with open(os.path.join(o, "prompts.txt"), "w", encoding="utf-8") as fh:

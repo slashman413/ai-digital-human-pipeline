@@ -64,7 +64,7 @@ jobs:
           YOUTUBE_REFRESH_TOKEN: ${{ inputs.publish != 'false' && secrets.YOUTUBE_REFRESH_TOKEN || '' }}
         run: |
           python scripts/upload_youtube.py --video output/video.mp4 \
-            --title "$(cat title.txt) · dark ambient music for sleep study relax" \
+            --title "$(cat yt_title.txt)" \
             --description "$(cat description.txt)" --tags "$(cat tags.txt)" \
             --privacy public --thumbnail output/thumbnail.jpg --url-out youtube_url.txt \
             --playlist PLX0z3_uqHkc2NujR-UyNFbbBJXobaz2Bw --channel-id UCvd4nL04uE7lFqkKtzsOwLg || true
