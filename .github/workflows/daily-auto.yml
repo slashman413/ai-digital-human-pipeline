@@ -149,14 +149,25 @@ jobs:
           fi
           python scripts/upload_bilibili.py --video output/final_video.mp4 --title "$(cat title.txt)" --description "$(cat description.txt)" --tags "$(cat tags.txt)"
 
-      - name: 6) Notify Discord
-        if: always()
+      - name: 6) Notify Discord (success)
+        if: success()
+        env:
+          WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        run: |
+          if [ -n "$WEBHOOK" ]; then
+            URL=$(cat youtube_url.txt 2>/dev/null || echo "")
+            curl -s -H "Content-Type: application/json" \
+              -d "{\"content\":\"🎬 每日自動影片完成並發布：$(cat title.txt 2>/dev/null) $URL\"}" "$WEBHOOK"
+          fi
+
+      - name: 6b) Notify Discord on failure (D12)
+        if: failure()
         env:
           WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
         run: |
           if [ -n "$WEBHOOK" ]; then
             curl -s -H "Content-Type: application/json" \
-              -d "{\"content\":\"🎬 每日自動影片完成並發布：$(cat title.txt 2>/dev/null)\"}" "$WEBHOOK"
+              -d "{\"content\":\"🔴 每日 AI 影片 workflow 失敗！查看 log：${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" "$WEBHOOK"
           fi
 
       - name: Upload artifact

@@ -69,15 +69,25 @@ jobs:
             --privacy public --thumbnail output/thumbnail.jpg --url-out youtube_url.txt \
             --playlist PLX0z3_uqHkc2NujR-UyNFbbBJXobaz2Bw --channel-id UCvd4nL04uE7lFqkKtzsOwLg || true
 
-      - name: 6) Notify Discord
-        if: always()
+      - name: 6) Notify Discord (success)
+        if: success()
         env:
           WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
         run: |
           if [ -n "$WEBHOOK" ]; then
             URL=$(cat youtube_url.txt 2>/dev/null || echo "")
             curl -s -H "Content-Type: application/json" \
-              -d "{\"content\":\"🌙 每日 dreamscape 音樂影片：$(cat title.txt 2>/dev/null) $URL\"}" "$WEBHOOK"
+              -d "{\"content\":\"🌙 dreamscape 音樂影片：$(cat title.txt 2>/dev/null) $URL\"}" "$WEBHOOK"
+          fi
+
+      - name: 6b) Notify Discord on failure (D12)
+        if: failure()
+        env:
+          WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        run: |
+          if [ -n "$WEBHOOK" ]; then
+            curl -s -H "Content-Type: application/json" \
+              -d "{\"content\":\"🔴 dreamscape 音樂影片 workflow 失敗！查看 log：${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" "$WEBHOOK"
           fi
 
       - name: Upload artifact
@@ -88,7 +98,7 @@ jobs:
           path: |
             output/video.mp4
             output/thumbnail.jpg
-            output/music.mp3
+            output/music.wav
             title.txt
             description.txt
             tags.txt
