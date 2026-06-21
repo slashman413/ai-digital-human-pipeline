@@ -26,18 +26,24 @@ def main():
 
     tags = [t.strip() for t in args.tags.split(",") if t.strip()]
 
-    # A3: append a CTA link-drive (subscribe + playlist) to the description
-    cta = []
+    desc = args.description.rstrip()
+
+    # C: place the Amazon affiliate recommendation near the TOP (visible in the collapsed
+    # description = far more clicks) right after the hook line, with the required disclosure.
     if args.affiliate:
-        # C: Amazon affiliate recommendation + required disclosure
-        cta.append(args.affiliate)
-        cta.append("（含 Amazon 聯盟連結 / As an Amazon Associate I earn from qualifying purchases.）")
+        aff = args.affiliate + "\n（廣告/含 Amazon 聯盟連結 · As an Amazon Associate I earn from qualifying purchases.）"
+        parts = desc.split("\n", 1)
+        desc = parts[0] + "\n\n" + aff + ("\n\n" + parts[1] if len(parts) == 2 else "")
+
+    # A3: subscribe + playlist link-drive at the bottom
+    cta = []
     if args.channel_id:
         cta.append(f"▶ 訂閱 Subscribe: https://www.youtube.com/channel/{args.channel_id}?sub_confirmation=1")
     if args.playlist:
         cta.append(f"🎵 播放清單 Playlist: https://www.youtube.com/playlist?list={args.playlist}")
     if cta:
-        args.description = args.description.rstrip() + "\n\n" + "\n".join(cta)
+        desc = desc + "\n\n" + "\n".join(cta)
+    args.description = desc
 
     client_id = os.environ.get("YOUTUBE_CLIENT_ID")
     client_secret = os.environ.get("YOUTUBE_CLIENT_SECRET")
