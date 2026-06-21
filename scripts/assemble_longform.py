@@ -144,13 +144,17 @@ def main() -> int:
     srt = os.path.join(workdir, "subs.srt")
     build_srt(scenes, starts, total, srt)
     srt_ff = srt.replace("\\", "/").replace(":", "\\:")
-    style = f"FontName={args.font},FontSize=22,PrimaryColour=&H00FFFFFF,Outline=2,Shadow=1,MarginV=30"
+    fs = max(24, int(h / 34))  # scale subtitle size to resolution (~32 @1080p)
+    style = f"FontName={args.font},FontSize={fs},PrimaryColour=&H00FFFFFF,Outline=2,Shadow=1,MarginV=40"
+    LOUDNORM = "loudnorm=I=-16:TP=-1.5:LRA=11"  # EBM R128 normalization for consistent volume
 
     # 2) crossfade all segments (video xfade + audio acrossfade), then burn subtitles
     if n == 1:
         run(["ffmpeg", "-y", "-i", seg_paths[0],
              "-vf", f"subtitles='{srt_ff}':charenc=UTF-8:force_style='{style}'",
-             "-c:v", "libx264", "-crf", "23", "-pix_fmt", "yuv420p", "-c:a", "copy", args.output])
+             "-af", LOUDNORM,
+             "-c:v", "libx264", "-crf", "20", "-pix_fmt", "yuv420p",
+             "-c:a", "aac", "-b:a", "192k", args.output])
     else:
         inputs = []
         for p in seg_paths:
@@ -167,13 +171,15 @@ def main() -> int:
             vprev, aprev = vout, aout
         # burn subtitles on the final crossfaded video
         vchain.append(f"{vprev}subtitles='{srt_ff}':charenc=UTF-8:force_style='{style}'[vout]")
+        # normalize final audio loudness
+        achain.append(f"{aprev}{LOUDNORM}[aout]")
         fc = ";".join(vchain + achain)
         run([
             "ffmpeg", "-y", *inputs,
             "-filter_complex", fc,
-            "-map", "[vout]", "-map", aprev,
-            "-c:v", "libx264", "-preset", "medium", "-crf", "23", "-pix_fmt", "yuv420p",
-            "-c:a", "aac", "-b:a", "128k", args.output,
+            "-map", "[vout]", "-map", "[aout]",
+            "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-pix_fmt", "yuv420p",
+            "-c:a", "aac", "-b:a", "192k", args.output,
         ])
     print(f"[ok] wrote {args.output}: {n} scenes, ~{total:.0f}s @ {w}x{h}/{fps}fps, "
           f"static bg + random transitions (T={T}s)")

@@ -18,6 +18,7 @@ def main():
     parser.add_argument("--privacy", default="private",
                         choices=["public", "unlisted", "private"], help="privacy status")
     parser.add_argument("--url-out", default="", help="write the uploaded video URL to this file")
+    parser.add_argument("--thumbnail", default="", help="path to a custom thumbnail image")
     args = parser.parse_args()
 
     tags = [t.strip() for t in args.tags.split(",") if t.strip()]
@@ -88,6 +89,16 @@ def main():
     if args.url_out:
         with open(args.url_out, "w", encoding="utf-8") as fh:
             fh.write(url)
+
+    # set a custom thumbnail (biggest CTR lever) if provided
+    if args.thumbnail and os.path.isfile(args.thumbnail) and os.path.getsize(args.thumbnail) > 0:
+        try:
+            youtube.thumbnails().set(
+                videoId=video_id, media_body=MediaFileUpload(args.thumbnail)
+            ).execute()
+            print(f"[ok] custom thumbnail set: {args.thumbnail}")
+        except Exception as exc:  # noqa: BLE001 — requires a verified channel; non-fatal
+            print(f"[warn] thumbnail set failed (channel may need verification): {exc}")
 
 
 if __name__ == "__main__":

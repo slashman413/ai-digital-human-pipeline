@@ -81,6 +81,43 @@ def fallback(topic: str, scenes: int, per_chars: int) -> dict:
     }
 
 
+SEO_SYS = "你是 YouTube SEO 與成長專家。只輸出嚴格 JSON，不要 markdown 圍欄或說明。"
+
+
+def seo_metadata(title: str, topic: str, scenes: list[dict]) -> dict:
+    """LLM-generated, YouTube-SEO-optimized title / description / tags."""
+    outline = "；".join(s.get("narration", "")[:30] for s in scenes[:6])
+    prompt = (
+        f"影片主題：{topic if topic not in ('', 'auto') else title}\n"
+        f"內容大綱：{outline}\n\n"
+        "請產出能『最大化 YouTube 搜尋曝光與點擊率』的中繼資料，繁體中文，嚴格 JSON：\n"
+        '{"seo_title":"<≤40字、關鍵字前置、引發好奇、可點擊>",'
+        '"description":"<第一行強力 hook 含主要關鍵字；接 2-3 句含可搜尋關鍵字的說明；'
+        '再列 3 個重點 bullet；最後一行行動呼籲『喜歡的話記得訂閱與分享』；'
+        '結尾放 5 個相關 #hashtag>",'
+        '"tags":["<12-15 個 SEO 標籤，中英混合、含主題關鍵字+相關詞+長尾詞>"]}'
+    )
+    try:
+        d = parse_json(complete(SEO_SYS, prompt, max_tokens=1200))
+        st = (d.get("seo_title") or title).strip()
+        desc = (d.get("description") or "").strip()
+        tags = d.get("tags") or []
+        if isinstance(tags, str):
+            tags = [t.strip() for t in tags.split(",")]
+        tags = [t.strip() for t in tags if t and t.strip()][:15]
+        if st and desc and tags:
+            return {"title": st, "description": desc, "tags": ",".join(tags)}
+    except Exception as e:  # noqa: BLE001
+        print(f"[warn] SEO metadata failed ({e}); using fallback.")
+    # heuristic fallback
+    words = [w for w in re.split(r"[：:，,、\s]+", title) if 2 <= len(w) <= 8][:4]
+    return {
+        "title": title,
+        "description": f"{title}\n\n本片帶你快速搞懂重點。喜歡的話記得訂閱與分享！\n\n#AI #知識 #科普 #每日更新 #懶人包",
+        "tags": ",".join(dict.fromkeys(words + ["AI", "知識", "科普", "懶人包", "每日更新"])),
+    }
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--topic", default="auto")
@@ -118,17 +155,16 @@ def main() -> int:
     with open(args.output, "w", encoding="utf-8") as fh:
         json.dump(data, fh, ensure_ascii=False, indent=2)
 
-    # Publish metadata (consumed by upload_*.py via the workflow)
+    # SEO-optimized publish metadata (consumed by upload_*.py via the workflow)
     title = data.get("title", "AI 影片")
-    topic_disp = args.topic if args.topic not in ("", "auto") else title
+    meta = seo_metadata(title, args.topic, data["scenes"])
     with open("title.txt", "w", encoding="utf-8") as fh:
-        fh.write(title)
+        fh.write(meta["title"])
     with open("description.txt", "w", encoding="utf-8") as fh:
-        fh.write(f"{title}\n\n本片主題：{topic_disp}。由 AI 每日自動生成（腳本/配音/畫面）。")
-    words = [w for w in re.split(r"[：:，,、\s]+", title) if 2 <= len(w) <= 8][:4]
-    tags = ",".join(dict.fromkeys(words + ["AI", "知識", "科普", "每日更新"]))
+        fh.write(meta["description"])
     with open("tags.txt", "w", encoding="utf-8") as fh:
-        fh.write(tags)
+        fh.write(meta["tags"])
+    print(f"[seo] title={meta['title']!r}  tags={meta['tags'][:60]}...")
 
     chars = sum(len(s["narration"]) for s in data["scenes"])
     print(f"[ok] wrote {args.output}: title={data.get('title')!r}, scenes={len(data['scenes'])}, "

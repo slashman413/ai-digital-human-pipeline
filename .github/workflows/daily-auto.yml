@@ -71,18 +71,21 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: python scripts/generate_longform.py --topic "$(cat topic.txt)" --minutes ${{ inputs.minutes || '10' }} --output scenes.json
 
-      - name: 3) Per-scene TTS + photorealistic backgrounds (720p)
-        run: python scripts/generate_scene_assets.py --scenes scenes.json --voice zh-TW-HsiaoChenNeural --workdir build --width 1280 --height 720
+      - name: 3) Per-scene TTS + photorealistic backgrounds (1080p)
+        run: python scripts/generate_scene_assets.py --scenes scenes.json --voice zh-TW-HsiaoChenNeural --workdir build --width 1920 --height 1080
 
-      - name: 4) Assemble 720p@15fps (static bg + random transitions + subs)
-        run: python scripts/assemble_longform.py --manifest build/manifest.json --output output/final_video.mp4 --fps 15 --transition 0.8 --font "Noto Sans CJK TC"
+      - name: 4) Assemble 1080p@30fps (transitions + subs + audio loudnorm)
+        run: python scripts/assemble_longform.py --manifest build/manifest.json --output output/final_video.mp4 --fps 30 --transition 0.8 --font "Noto Sans CJK TC"
+
+      - name: 4b) Generate eye-catching thumbnail (CTR)
+        run: python scripts/make_thumbnail.py --image build/img_00.jpg --title "$(cat title.txt)" --output output/thumbnail.jpg --font "Noto Sans CJK TC"
 
       - name: 5a) Publish full video to YouTube (public)
         env:
           YOUTUBE_CLIENT_ID: ${{ inputs.publish != 'false' && secrets.YOUTUBE_CLIENT_ID || '' }}
           YOUTUBE_CLIENT_SECRET: ${{ inputs.publish != 'false' && secrets.YOUTUBE_CLIENT_SECRET || '' }}
           YOUTUBE_REFRESH_TOKEN: ${{ inputs.publish != 'false' && secrets.YOUTUBE_REFRESH_TOKEN || '' }}
-        run: python scripts/upload_youtube.py --video output/final_video.mp4 --title "$(cat title.txt)" --description "$(cat description.txt)" --tags "$(cat tags.txt)" --privacy public --url-out youtube_url.txt
+        run: python scripts/upload_youtube.py --video output/final_video.mp4 --title "$(cat title.txt)" --description "$(cat description.txt)" --tags "$(cat tags.txt)" --privacy public --url-out youtube_url.txt --thumbnail output/thumbnail.jpg
 
       - name: 5b) Make + publish 20s YouTube Short (teaser, links to full video)
         env:

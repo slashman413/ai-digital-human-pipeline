@@ -56,7 +56,7 @@ async def tts(text: str, voice: str, out_path: str) -> None:
 
 def fetch_image(prompt: str, out_path: str, width: int, height: int, seed: int) -> bool:
     url = (IMAGE_BASE_URL + urllib.parse.quote(prompt + STYLE_SUFFIX)
-           + f"?width={width}&height={height}&nologo=true&seed={seed}")
+           + f"?width={width}&height={height}&nologo=true&enhance=true&model=flux&seed={seed}")
     for attempt in range(3):
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "digital-human-pipeline"})
@@ -84,8 +84,8 @@ def main() -> int:
     ap.add_argument("--scenes", default="scenes.json")
     ap.add_argument("--voice", default="zh-TW-HsiaoChenNeural")
     ap.add_argument("--workdir", default="build")
-    ap.add_argument("--width", type=int, default=1280)
-    ap.add_argument("--height", type=int, default=720)
+    ap.add_argument("--width", type=int, default=1920)
+    ap.add_argument("--height", type=int, default=1080)
     args = ap.parse_args()
 
     os.makedirs(args.workdir, exist_ok=True)
