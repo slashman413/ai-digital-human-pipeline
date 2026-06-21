@@ -19,9 +19,20 @@ def main():
                         choices=["public", "unlisted", "private"], help="privacy status")
     parser.add_argument("--url-out", default="", help="write the uploaded video URL to this file")
     parser.add_argument("--thumbnail", default="", help="path to a custom thumbnail image")
+    parser.add_argument("--playlist", default="", help="playlist ID to add the uploaded video to")
+    parser.add_argument("--channel-id", default="", help="channel ID — appends a subscribe CTA to the description")
     args = parser.parse_args()
 
     tags = [t.strip() for t in args.tags.split(",") if t.strip()]
+
+    # A3: append a CTA link-drive (subscribe + playlist) to the description
+    cta = []
+    if args.channel_id:
+        cta.append(f"▶ 訂閱 Subscribe: https://www.youtube.com/channel/{args.channel_id}?sub_confirmation=1")
+    if args.playlist:
+        cta.append(f"🎵 播放清單 Playlist: https://www.youtube.com/playlist?list={args.playlist}")
+    if cta:
+        args.description = args.description.rstrip() + "\n\n" + "\n".join(cta)
 
     client_id = os.environ.get("YOUTUBE_CLIENT_ID")
     client_secret = os.environ.get("YOUTUBE_CLIENT_SECRET")
@@ -99,6 +110,18 @@ def main():
             print(f"[ok] custom thumbnail set: {args.thumbnail}")
         except Exception as exc:  # noqa: BLE001 — requires a verified channel; non-fatal
             print(f"[warn] thumbnail set failed (channel may need verification): {exc}")
+
+    # A1: add the video to a playlist (needs youtube.force-ssl scope)
+    if args.playlist:
+        try:
+            youtube.playlistItems().insert(
+                part="snippet",
+                body={"snippet": {"playlistId": args.playlist,
+                                  "resourceId": {"kind": "youtube#video", "videoId": video_id}}},
+            ).execute()
+            print(f"[ok] added to playlist: {args.playlist}")
+        except Exception as exc:  # noqa: BLE001 — non-fatal
+            print(f"[warn] playlist add failed: {exc}")
 
 
 if __name__ == "__main__":

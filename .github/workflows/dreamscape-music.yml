@@ -65,7 +65,8 @@ jobs:
           python scripts/upload_youtube.py --video output/video.mp4 \
             --title "$(cat title.txt) · dark ambient music for sleep study relax" \
             --description "$(cat description.txt)" --tags "$(cat tags.txt)" \
-            --privacy public --thumbnail output/thumbnail.jpg --url-out youtube_url.txt || true
+            --privacy public --thumbnail output/thumbnail.jpg --url-out youtube_url.txt \
+            --playlist PLX0z3_uqHkc2NujR-UyNFbbBJXobaz2Bw --channel-id UCvd4nL04uE7lFqkKtzsOwLg || true
 
       - name: 6) Notify Discord
         if: always()
