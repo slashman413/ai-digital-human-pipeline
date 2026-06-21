@@ -50,7 +50,7 @@ jobs:
           python scripts/make_music_video.py --music output/music.mp3 \
             --prompts-file prompts.txt --title "$(cat title.txt)" \
             --output output/video.mp4 --workdir build_mv --font "DejaVu Sans" \
-            --loop-to "${{ inputs.length || '120' }}"
+            --loop-to "${{ inputs.length || '120' }}" --snow assets/snow.png
 
       - name: 4) Thumbnail (frame with title)
         run: |

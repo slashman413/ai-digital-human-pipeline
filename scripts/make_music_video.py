@@ -103,6 +103,8 @@ def main() -> int:
     ap.add_argument("--xfade", type=float, default=2.5)
     ap.add_argument("--loop-to", type=float, default=0,
                     help="if music is shorter than this many seconds, seamlessly loop it up to it")
+    ap.add_argument("--snow", default="",
+                    help="path to a tall snow texture PNG; overlaid as gentle falling snow")
     args = ap.parse_args()
 
     os.makedirs(args.workdir, exist_ok=True)
@@ -162,8 +164,8 @@ def main() -> int:
                         "-map", f"[{prev}]", "-c:v", "libx264", "-pix_fmt", "yuv420p",
                         "-r", str(FPS), silent], check=True, capture_output=True)
 
-    # title overlay (small, spaced, lowercase, centered) + music + gentle audio fade out
-    vf = None
+    # title overlay (small, spaced, lowercase, centered)
+    draw = None
     if args.title:
         spaced = "  ".join(list(args.title.strip()))  # letter spacing between chars
         if args.fontfile:
@@ -174,17 +176,28 @@ def main() -> int:
         else:
             font = "font='sans'"
         txt = spaced.replace("'", "").replace(":", "\\:")
-        vf = (f"drawtext={font}:text='{txt}':fontcolor=white@0.82:fontsize=34:"
-              f"x=(w-text_w)/2:y=(h-text_h)/2:shadowcolor=black@0.4:shadowx=1:shadowy=1")
+        draw = (f"drawtext={font}:text='{txt}':fontcolor=white@0.82:fontsize=34:"
+                f"x=(w-text_w)/2:y=(h-text_h)/2:shadowcolor=black@0.4:shadowx=1:shadowy=1")
 
     fade_start = max(0.0, music_dur - 4)
     afilter = f"afade=t=out:st={fade_start:.2f}:d=4"
+    has_snow = bool(args.snow and os.path.isfile(args.snow))
 
-    cmd = ["ffmpeg", "-y", "-i", silent, "-i", args.music]
-    if vf:
-        cmd += ["-vf", vf]
-    cmd += ["-af", afilter, "-shortest", "-c:v", "libx264", "-crf", "20", "-preset", "medium",
-            "-c:a", "aac", "-b:a", "192k", "-pix_fmt", "yuv420p", args.output]
+    if has_snow:
+        # gentle falling snow: tile the texture 2x vertically so the downward scroll loops seamlessly
+        chain = ("[1:v]split=2[sa][sb];[sa][sb]vstack=inputs=2[snow];"
+                 "[0:v][snow]overlay=0:'mod(t*90,2400)-2400':eof_action=pass[vo]")
+        chain += f";[vo]{draw}[v]" if draw else ";[vo]copy[v]"
+        cmd = ["ffmpeg", "-y", "-i", silent, "-loop", "1", "-i", args.snow, "-i", args.music,
+               "-filter_complex", chain, "-map", "[v]", "-map", "2:a",
+               "-af", afilter, "-shortest", "-c:v", "libx264", "-crf", "20", "-preset", "medium",
+               "-c:a", "aac", "-b:a", "192k", "-pix_fmt", "yuv420p", args.output]
+    else:
+        cmd = ["ffmpeg", "-y", "-i", silent, "-i", args.music]
+        if draw:
+            cmd += ["-vf", draw]
+        cmd += ["-af", afilter, "-shortest", "-c:v", "libx264", "-crf", "20", "-preset", "medium",
+                "-c:a", "aac", "-b:a", "192k", "-pix_fmt", "yuv420p", args.output]
     subprocess.run(cmd, check=True, capture_output=True)
     print(f"[mv] wrote {args.output}: {ffprobe_duration(args.output):.1f}s @ {W}x{H}/{FPS}fps")
     return 0
