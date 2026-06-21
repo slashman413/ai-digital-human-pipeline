@@ -5,9 +5,9 @@ on:
     - cron: "30 2 * * *"   # daily 02:30 UTC (10:30 Taiwan)
   workflow_dispatch:
     inputs:
-      duration:
-        description: "music length in seconds (120-180)"
-        default: "150"
+      length:
+        description: "final video length seconds (music generated short + looped to this)"
+        default: "120"
       publish:
         description: "publish to YouTube (false = build only)"
         default: "true"
@@ -37,18 +37,20 @@ jobs:
           echo "Title: $(cat title.txt)"
           echo "Music: $(cat music_prompt.txt)"
 
-      - name: 2) Generate dark ambient music (Replicate MusicGen)
+      - name: 2) Generate dark ambient music (Replicate MusicGen — short clip, cost-saver)
         env:
           REPLICATE_API_TOKEN: ${{ secrets.REPLICATE_API_TOKEN }}
         run: |
+          # generate only ~30s (cheap) on the mono 'large' model; looped to full length in step 3
           python scripts/generate_music.py --prompt "$(cat music_prompt.txt)" \
-            --duration "${{ inputs.duration || '150' }}" --output output/music.mp3
+            --duration 30 --model-version large --output output/music.mp3
 
-      - name: 3) Assemble dreamscape music video (1080p)
+      - name: 3) Assemble dreamscape music video (1080p, music looped to full length)
         run: |
           python scripts/make_music_video.py --music output/music.mp3 \
             --prompts-file prompts.txt --title "$(cat title.txt)" \
-            --output output/video.mp4 --workdir build_mv --font "DejaVu Sans"
+            --output output/video.mp4 --workdir build_mv --font "DejaVu Sans" \
+            --loop-to "${{ inputs.length || '120' }}"
 
       - name: 4) Thumbnail (frame with title)
         run: |

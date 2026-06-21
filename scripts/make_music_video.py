@@ -52,6 +52,28 @@ def ffprobe_duration(path: str) -> float:
         return 0.0
 
 
+def loop_audio(src: str, out: str, target: float, xfade: float = 3.0) -> str:
+    """Seamlessly loop a short clip up to `target` seconds via crossfades (cost saver:
+    generate ~30s once, loop it instead of paying for long generation)."""
+    import math
+    L = ffprobe_duration(src)
+    if L <= 0 or target <= L + 1:
+        return src
+    n = max(2, math.ceil((target - xfade) / max(1.0, L - xfade)))
+    inputs: list[str] = []
+    for _ in range(n):
+        inputs += ["-i", src]
+    fc, prev = [], "0:a"
+    for i in range(1, n):
+        lbl = f"a{i}"
+        fc.append(f"[{prev}][{i}:a]acrossfade=d={xfade}:c1=tri:c2=tri[{lbl}]")
+        prev = lbl
+    subprocess.run(["ffmpeg", "-y", *inputs, "-filter_complex", ";".join(fc),
+                    "-map", f"[{prev}]", "-t", f"{target}", out], check=True, capture_output=True)
+    print(f"[mv] looped music {L:.0f}s x{n} -> {target:.0f}s")
+    return out
+
+
 def ken_burns_segment(img: str, out: str, dur: float, zoom_in: bool) -> None:
     """Render one slow, smooth Ken Burns clip. Pre-upscale keeps the zoom sub-pixel smooth."""
     frames = max(1, int(dur * FPS))
@@ -79,6 +101,8 @@ def main() -> int:
     ap.add_argument("--font", default="")          # fontconfig name (runner)
     ap.add_argument("--fontfile", default="")       # explicit file (Windows)
     ap.add_argument("--xfade", type=float, default=2.5)
+    ap.add_argument("--loop-to", type=float, default=0,
+                    help="if music is shorter than this many seconds, seamlessly loop it up to it")
     args = ap.parse_args()
 
     os.makedirs(args.workdir, exist_ok=True)
@@ -88,6 +112,10 @@ def main() -> int:
     if music_dur < 5:
         print(f"[mv] ERROR: music too short/invalid ({music_dur}s)")
         return 1
+    if args.loop_to and args.loop_to > music_dur + 1:
+        looped = os.path.join(args.workdir, "music_looped.mp3")
+        args.music = loop_audio(args.music, looped, args.loop_to)
+        music_dur = ffprobe_duration(args.music)
 
     prompts = [ln.strip() for ln in open(args.prompts_file, encoding="utf-8") if ln.strip()]
     if not prompts:
