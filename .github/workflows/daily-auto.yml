@@ -126,6 +126,11 @@ jobs:
           name: daily-video
           path: |
             output/final_video.mp4
+            output/thumbnail.jpg
+            output/short.mp4
             scenes.json
             topic.txt
+            title.txt
+            description.txt
+            tags.txt
           retention-days: 7
