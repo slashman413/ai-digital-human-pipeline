@@ -28,14 +28,14 @@ def _req(url: str, token: str, data: dict | None = None) -> dict:
 
 
 def generate(prompt: str, duration: int, out_path: str, token: str,
-             model_version: str = "stereo-large") -> bool:
+             model_version: str = "stereo-large", output_format: str = "mp3") -> bool:
     payload = {
         "version": MUSICGEN_VERSION,
         "input": {
             "prompt": prompt,
             "duration": int(duration),
             "model_version": model_version,
-            "output_format": "mp3",
+            "output_format": output_format,
             "normalization_strategy": "loudness",
         },
     }
@@ -67,12 +67,13 @@ def main() -> int:
     ap.add_argument("--duration", type=int, default=150)
     ap.add_argument("--output", default="output/music.mp3")
     ap.add_argument("--model-version", default="stereo-large")
+    ap.add_argument("--output-format", default="mp3", choices=["mp3", "wav"])
     args = ap.parse_args()
     token = os.getenv("REPLICATE_API_TOKEN", "").strip()
     if not token:
         print("[music] ERROR: REPLICATE_API_TOKEN not set")
         return 1
-    ok = generate(args.prompt, args.duration, args.output, token, args.model_version)
+    ok = generate(args.prompt, args.duration, args.output, token, args.model_version, args.output_format)
     return 0 if ok else 1
 
 

@@ -41,13 +41,14 @@ jobs:
         env:
           REPLICATE_API_TOKEN: ${{ secrets.REPLICATE_API_TOKEN }}
         run: |
-          # generate only ~30s (cheap) on the mono 'large' model; looped to full length in step 3
+          # generate ~30s (cheap) then loop in step 3; stereo-large + WAV for better audio
+          # quality (at 30s, stereo costs ~the same GPU time as mono)
           python scripts/generate_music.py --prompt "$(cat music_prompt.txt)" \
-            --duration 30 --model-version large --output output/music.mp3
+            --duration 30 --model-version stereo-large --output-format wav --output output/music.wav
 
       - name: 3) Assemble dreamscape music video (1080p, music looped to full length)
         run: |
-          python scripts/make_music_video.py --music output/music.mp3 \
+          python scripts/make_music_video.py --music output/music.wav \
             --prompts-file prompts.txt --title "$(cat title.txt)" \
             --output output/video.mp4 --workdir build_mv --font "DejaVu Sans" \
             --loop-to "${{ inputs.length || '120' }}" --snow assets/snow.png

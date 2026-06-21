@@ -115,7 +115,7 @@ def main() -> int:
         print(f"[mv] ERROR: music too short/invalid ({music_dur}s)")
         return 1
     if args.loop_to and args.loop_to > music_dur + 1:
-        looped = os.path.join(args.workdir, "music_looped.mp3")
+        looped = os.path.join(args.workdir, "music_looped.wav")  # lossless intermediate
         args.music = loop_audio(args.music, looped, args.loop_to)
         music_dur = ffprobe_duration(args.music)
 
@@ -191,13 +191,13 @@ def main() -> int:
         cmd = ["ffmpeg", "-y", "-i", silent, "-loop", "1", "-i", args.snow, "-i", args.music,
                "-filter_complex", chain, "-map", "[v]", "-map", "2:a",
                "-af", afilter, "-shortest", "-c:v", "libx264", "-crf", "20", "-preset", "medium",
-               "-c:a", "aac", "-b:a", "192k", "-pix_fmt", "yuv420p", args.output]
+               "-c:a", "aac", "-b:a", "320k", "-ar", "48000", "-pix_fmt", "yuv420p", args.output]
     else:
         cmd = ["ffmpeg", "-y", "-i", silent, "-i", args.music]
         if draw:
             cmd += ["-vf", draw]
         cmd += ["-af", afilter, "-shortest", "-c:v", "libx264", "-crf", "20", "-preset", "medium",
-                "-c:a", "aac", "-b:a", "192k", "-pix_fmt", "yuv420p", args.output]
+                "-c:a", "aac", "-b:a", "320k", "-ar", "48000", "-pix_fmt", "yuv420p", args.output]
     subprocess.run(cmd, check=True, capture_output=True)
     print(f"[mv] wrote {args.output}: {ffprobe_duration(args.output):.1f}s @ {W}x{H}/{FPS}fps")
     return 0

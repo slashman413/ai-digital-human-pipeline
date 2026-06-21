@@ -14,7 +14,9 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from llm import complete  # noqa: E402
 
-SYS = "You are a creative director for a dark-ambient music channel (think Øneheart, Antent). Output strict JSON only."
+SYS = ("You are a creative director for an ethereal dark-ambient music channel "
+       "(think Øneheart, Antent, 'made from dreams' — calm, mysterious, emotional, cinematic). "
+       "Output strict JSON only.")
 
 PROMPT = (
     "Design ONE short ambient track concept in the style of the YouTube channel 'dreamscape..' "
@@ -54,7 +56,7 @@ def fallback() -> dict:
     title = rng.choice(FALLBACK_TITLES)
     return {
         "title": title,
-        "music_prompt": "dark atmospheric ambient, slow, ethereal reverb pads, melancholic, lonely, no drums, cinematic",
+        "music_prompt": "ethereal dark ambient, slow, calm, mysterious, emotional, lush reverb pads, dreamy, cinematic, no drums, no percussion",
         "image_prompts": FALLBACK_SCENES,
         "description": (f"{title} — dark ambient music for sleep, study and relaxation.\n\n"
                         "drift away into a quiet winter dream.\nput it on, breathe, and let go.\n\n"
