@@ -82,7 +82,7 @@ jobs:
           YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
-        run: python scripts/upload_youtube.py --video output/final_video.mp4 --title "$(cat title.txt)" --description "$(cat description.txt)" --tags "$(cat tags.txt)"
+        run: python scripts/upload_youtube.py --video output/final_video.mp4 --title "$(cat title.txt)" --description "$(cat description.txt)" --tags "$(cat tags.txt)" --privacy public
 
       - name: 5b) Publish to TikTok
         env:

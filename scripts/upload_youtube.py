@@ -15,6 +15,8 @@ def main():
     parser.add_argument("--title", required=True, help="video title")
     parser.add_argument("--description", required=True, help="video description")
     parser.add_argument("--tags", required=True, help="comma-separated tags")
+    parser.add_argument("--privacy", default="private",
+                        choices=["public", "unlisted", "private"], help="privacy status")
     args = parser.parse_args()
 
     tags = [t.strip() for t in args.tags.split(",") if t.strip()]
@@ -38,7 +40,7 @@ def main():
         print(f"  title      : {args.title}")
         print(f"  description: {args.description}")
         print(f"  tags       : {tags}")
-        print("  privacy    : private")
+        print(f"  privacy    : {args.privacy}")
         print("  category   : 22")
         sys.exit(0)
 
@@ -68,7 +70,7 @@ def main():
             "tags": tags,
             "categoryId": "22",
         },
-        "status": {"privacyStatus": "private"},
+        "status": {"privacyStatus": args.privacy},
     }
 
     media = MediaFileUpload(args.video, chunksize=-1, resumable=True)
