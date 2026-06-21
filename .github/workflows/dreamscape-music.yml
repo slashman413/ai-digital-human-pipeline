@@ -67,7 +67,8 @@ jobs:
             --title "$(cat yt_title.txt)" \
             --description "$(cat description.txt)" --tags "$(cat tags.txt)" \
             --privacy public --thumbnail output/thumbnail.jpg --url-out youtube_url.txt \
-            --playlist PLX0z3_uqHkc2NujR-UyNFbbBJXobaz2Bw --channel-id UCvd4nL04uE7lFqkKtzsOwLg || true
+            --playlist PLX0z3_uqHkc2NujR-UyNFbbBJXobaz2Bw --channel-id UCvd4nL04uE7lFqkKtzsOwLg \
+            --affiliate "🎧 放鬆助眠好物 / relax & sleep gear: https://www.amazon.com/s?k=noise+cancelling+headphones+for+sleep&tag=ytstories0413-20" || true
 
       - name: 6) Notify Discord (success)
         if: success()

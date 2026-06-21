@@ -21,12 +21,17 @@ def main():
     parser.add_argument("--thumbnail", default="", help="path to a custom thumbnail image")
     parser.add_argument("--playlist", default="", help="playlist ID to add the uploaded video to")
     parser.add_argument("--channel-id", default="", help="channel ID — appends a subscribe CTA to the description")
+    parser.add_argument("--affiliate", default="", help="affiliate recommendation line appended to the description")
     args = parser.parse_args()
 
     tags = [t.strip() for t in args.tags.split(",") if t.strip()]
 
     # A3: append a CTA link-drive (subscribe + playlist) to the description
     cta = []
+    if args.affiliate:
+        # C: Amazon affiliate recommendation + required disclosure
+        cta.append(args.affiliate)
+        cta.append("（含 Amazon 聯盟連結 / As an Amazon Associate I earn from qualifying purchases.）")
     if args.channel_id:
         cta.append(f"▶ 訂閱 Subscribe: https://www.youtube.com/channel/{args.channel_id}?sub_confirmation=1")
     if args.playlist:
