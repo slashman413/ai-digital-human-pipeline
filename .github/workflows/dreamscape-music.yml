@@ -1,0 +1,91 @@
+name: Dreamscape Music Video
+
+on:
+  schedule:
+    - cron: "30 2 * * *"   # daily 02:30 UTC (10:30 Taiwan)
+  workflow_dispatch:
+    inputs:
+      duration:
+        description: "music length in seconds (120-180)"
+        default: "150"
+      publish:
+        description: "publish to YouTube (false = build only)"
+        default: "true"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install ffmpeg + fonts + deps
+        run: |
+          sudo apt-get update && sudo apt-get install -y ffmpeg fonts-dejavu-core
+          pip install -r requirements.txt
+
+      - name: 1) Daily concept (title + music/image prompts + SEO)
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          python scripts/dreamscape_concept.py --outdir .
+          echo "Title: $(cat title.txt)"
+          echo "Music: $(cat music_prompt.txt)"
+
+      - name: 2) Generate dark ambient music (Replicate MusicGen)
+        env:
+          REPLICATE_API_TOKEN: ${{ secrets.REPLICATE_API_TOKEN }}
+        run: |
+          python scripts/generate_music.py --prompt "$(cat music_prompt.txt)" \
+            --duration "${{ inputs.duration || '150' }}" --output output/music.mp3
+
+      - name: 3) Assemble dreamscape music video (1080p)
+        run: |
+          python scripts/make_music_video.py --music output/music.mp3 \
+            --prompts-file prompts.txt --title "$(cat title.txt)" \
+            --output output/video.mp4 --workdir build_mv --font "DejaVu Sans"
+
+      - name: 4) Thumbnail (frame with title)
+        run: |
+          ffmpeg -y -ss 8 -i output/video.mp4 -frames:v 1 -vf scale=1280:720 output/thumbnail.jpg
+
+      - name: 5) Publish to YouTube (public)
+        env:
+          YOUTUBE_CLIENT_ID: ${{ inputs.publish != 'false' && secrets.YOUTUBE_CLIENT_ID || '' }}
+          YOUTUBE_CLIENT_SECRET: ${{ inputs.publish != 'false' && secrets.YOUTUBE_CLIENT_SECRET || '' }}
+          YOUTUBE_REFRESH_TOKEN: ${{ inputs.publish != 'false' && secrets.YOUTUBE_REFRESH_TOKEN || '' }}
+        run: |
+          python scripts/upload_youtube.py --video output/video.mp4 \
+            --title "$(cat title.txt) · dark ambient music for sleep study relax" \
+            --description "$(cat description.txt)" --tags "$(cat tags.txt)" \
+            --privacy public --thumbnail output/thumbnail.jpg --url-out youtube_url.txt || true
+
+      - name: 6) Notify Discord
+        if: always()
+        env:
+          WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        run: |
+          if [ -n "$WEBHOOK" ]; then
+            URL=$(cat youtube_url.txt 2>/dev/null || echo "")
+            curl -s -H "Content-Type: application/json" \
+              -d "{\"content\":\"🌙 每日 dreamscape 音樂影片：$(cat title.txt 2>/dev/null) $URL\"}" "$WEBHOOK"
+          fi
+
+      - name: Upload artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dreamscape-music
+          path: |
+            output/video.mp4
+            output/thumbnail.jpg
+            output/music.mp3
+            title.txt
+            description.txt
+            tags.txt
+          retention-days: 7
