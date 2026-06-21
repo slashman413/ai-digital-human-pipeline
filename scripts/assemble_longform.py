@@ -120,6 +120,8 @@ def main() -> int:
     ap.add_argument("--transition", type=float, default=0.8)
     ap.add_argument("--font", default="Noto Sans CJK TC")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--bgm", default="", help="background music bed mixed (low volume) under narration")
+    ap.add_argument("--bgm-volume", type=float, default=0.12)
     args = ap.parse_args()
     rng = random.Random(args.seed)
 
@@ -197,6 +199,17 @@ def main() -> int:
             "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-pix_fmt", "yuv420p",
             "-c:a", "aac", "-b:a", "192k", args.output,
         ])
+    # B5: mix a looped, low-volume background music bed under the narration (video copied, no re-encode)
+    if args.bgm and os.path.isfile(args.bgm) and os.path.getsize(args.bgm) > 1000:
+        tmp = args.output + ".nobgm.mp4"
+        os.replace(args.output, tmp)
+        run(["ffmpeg", "-y", "-i", tmp, "-stream_loop", "-1", "-i", args.bgm,
+             "-filter_complex",
+             f"[1:a]volume={args.bgm_volume}[bg];[0:a][bg]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[a]",
+             "-map", "0:v", "-map", "[a]", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", args.output])
+        os.remove(tmp)
+        print(f"[ok] mixed background music bed (vol {args.bgm_volume})")
+
     print(f"[ok] wrote {args.output}: {n} scenes, ~{total:.0f}s @ {w}x{h}/{fps}fps, "
           f"static bg + random transitions (T={T}s)")
     return 0

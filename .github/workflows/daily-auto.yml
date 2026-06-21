@@ -77,8 +77,8 @@ jobs:
       - name: 3) Per-scene TTS + photorealistic backgrounds (1080p)
         run: python scripts/generate_scene_assets.py --scenes scenes.json --voice zh-TW-HsiaoChenNeural --workdir build --width 1920 --height 1080
 
-      - name: 4) Assemble 1080p@30fps (transitions + subs + audio loudnorm)
-        run: python scripts/assemble_longform.py --manifest build/manifest.json --output output/final_video.mp4 --fps 30 --transition 0.8 --font "Noto Sans CJK TC"
+      - name: 4) Assemble 1080p@30fps (transitions + subs + audio loudnorm + bgm bed)
+        run: python scripts/assemble_longform.py --manifest build/manifest.json --output output/final_video.mp4 --fps 30 --transition 0.8 --font "Noto Sans CJK TC" --bgm assets/bgm.mp3
 
       - name: 4b) Generate eye-catching thumbnail (CTR)
         run: python scripts/make_thumbnail.py --image build/img_00.jpg --title "$(cat title.txt)" --output output/thumbnail.jpg --font "Noto Sans CJK TC"
@@ -118,8 +118,8 @@ jobs:
       - name: EN-2) English voice-over (reuse zh background images)
         run: python scripts/generate_scene_assets.py --scenes scenes_en.json --voice en-US-AriaNeural --workdir build_en --reuse-images-from build --width 1920 --height 1080
 
-      - name: EN-3) Assemble English video 1080p@30fps
-        run: python scripts/assemble_longform.py --manifest build_en/manifest.json --output output/final_video_en.mp4 --fps 30 --transition 0.8 --font "Noto Sans CJK TC"
+      - name: EN-3) Assemble English video 1080p@30fps (+ bgm bed)
+        run: python scripts/assemble_longform.py --manifest build_en/manifest.json --output output/final_video_en.mp4 --fps 30 --transition 0.8 --font "Noto Sans CJK TC" --bgm assets/bgm.mp3
 
       - name: EN-4) English thumbnail
         run: python scripts/make_thumbnail.py --image build_en/img_00.jpg --title "$(cat title_en.txt)" --output output/thumbnail_en.jpg --font "Noto Sans CJK TC"
