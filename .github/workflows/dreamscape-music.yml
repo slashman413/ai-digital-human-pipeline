@@ -2,7 +2,7 @@ name: Dreamscape Music Video
 
 on:
   schedule:
-    - cron: "30 2 * * *"   # daily 02:30 UTC (10:30 Taiwan)
+    - cron: "30 2 * * 2,4,6"   # Tue/Thu/Sat 02:30 UTC (10:30 Taiwan)
   workflow_dispatch:
     inputs:
       length:
