@@ -16,7 +16,12 @@ from __future__ import annotations
 
 import sys
 
-SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
+# upload = publish videos; force-ssl = manage playlists/comments + read (for playlists,
+# pinned comments, and the YouTube-trending topic source).
+SCOPES = [
+    "https://www.googleapis.com/auth/youtube.upload",
+    "https://www.googleapis.com/auth/youtube.force-ssl",
+]
 
 
 def main() -> int:

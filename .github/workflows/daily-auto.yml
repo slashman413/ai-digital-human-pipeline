@@ -83,6 +83,13 @@ jobs:
       - name: 4b) Generate eye-catching thumbnail (CTR)
         run: python scripts/make_thumbnail.py --image build/img_00.jpg --title "$(cat title.txt)" --output output/thumbnail.jpg --font "Noto Sans CJK TC"
 
+      - name: 4c) Add chapter timestamps to description (retention + SEO)
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: python scripts/make_chapters.py --manifest build/manifest.json --scenes scenes.json --description description.txt --lang zh || true
+
       - name: 5a) Publish full video to YouTube (public)
         env:
           YOUTUBE_CLIENT_ID: ${{ inputs.publish != 'false' && secrets.YOUTUBE_CLIENT_ID || '' }}
@@ -116,6 +123,13 @@ jobs:
 
       - name: EN-4) English thumbnail
         run: python scripts/make_thumbnail.py --image build_en/img_00.jpg --title "$(cat title_en.txt)" --output output/thumbnail_en.jpg --font "Noto Sans CJK TC"
+
+      - name: EN-4b) Add English chapter timestamps
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: python scripts/make_chapters.py --manifest build_en/manifest.json --scenes scenes_en.json --description description_en.txt --lang en || true
 
       - name: EN-5) Publish English video to YouTube (public)
         env:
