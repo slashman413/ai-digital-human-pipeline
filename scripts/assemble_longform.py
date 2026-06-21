@@ -122,6 +122,7 @@ def main() -> int:
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--bgm", default="", help="background music bed mixed (low volume) under narration")
     ap.add_argument("--bgm-volume", type=float, default=0.12)
+    ap.add_argument("--watermark", default="", help="persistent brand watermark text (bottom-right)")
     args = ap.parse_args()
     rng = random.Random(args.seed)
 
@@ -166,10 +167,18 @@ def main() -> int:
     style = f"FontName={args.font},FontSize={fs},PrimaryColour=&H00FFFFFF,Outline=2,Shadow=1,MarginV=40"
     LOUDNORM = "loudnorm=I=-16:TP=-1.5:LRA=11"  # EBM R128 normalization for consistent volume
 
+    # B6: subtle persistent brand watermark (bottom-right), appended to the subtitle filter
+    wm = ""
+    if args.watermark:
+        wt = args.watermark.replace("'", "").replace(":", "\\:")
+        wm = (f",drawtext=font='{args.font}':text='{wt}':fontcolor=white@0.32:"
+              f"fontsize={max(16, int(h / 40))}:x=w-text_w-24:y=h-text_h-24:"
+              f"shadowcolor=black@0.5:shadowx=1:shadowy=1")
+
     # 2) crossfade all segments (video xfade + audio acrossfade), then burn subtitles
     if n == 1:
         run(["ffmpeg", "-y", "-i", seg_paths[0],
-             "-vf", f"subtitles='{srt_ff}':charenc=UTF-8:force_style='{style}'",
+             "-vf", f"subtitles='{srt_ff}':charenc=UTF-8:force_style='{style}'{wm}",
              "-af", LOUDNORM,
              "-c:v", "libx264", "-crf", "20", "-pix_fmt", "yuv420p",
              "-c:a", "aac", "-b:a", "192k", args.output])
@@ -188,7 +197,7 @@ def main() -> int:
             achain.append(f"{aprev}[{i}:a]acrossfade=d={T}{aout}")
             vprev, aprev = vout, aout
         # burn subtitles on the final crossfaded video
-        vchain.append(f"{vprev}subtitles='{srt_ff}':charenc=UTF-8:force_style='{style}'[vout]")
+        vchain.append(f"{vprev}subtitles='{srt_ff}':charenc=UTF-8:force_style='{style}'{wm}[vout]")
         # normalize final audio loudness
         achain.append(f"{aprev}{LOUDNORM}[aout]")
         fc = ";".join(vchain + achain)
