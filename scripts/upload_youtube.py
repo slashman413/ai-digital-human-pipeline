@@ -22,6 +22,7 @@ def main():
     parser.add_argument("--playlist", default="", help="playlist ID to add the uploaded video to")
     parser.add_argument("--channel-id", default="", help="channel ID — appends a subscribe CTA to the description")
     parser.add_argument("--affiliate", default="", help="affiliate recommendation line appended to the description")
+    parser.add_argument("--kofi", default="", help="Ko-fi support URL — appends a support line to the description")
     args = parser.parse_args()
 
     tags = [t.strip() for t in args.tags.split(",") if t.strip()]
@@ -41,6 +42,8 @@ def main():
         cta.append(f"▶ 訂閱 Subscribe: https://www.youtube.com/channel/{args.channel_id}?sub_confirmation=1")
     if args.playlist:
         cta.append(f"🎵 播放清單 Playlist: https://www.youtube.com/playlist?list={args.playlist}")
+    if args.kofi:
+        cta.append(f"☕ 支持頻道 Support us: {args.kofi}")
     if cta:
         desc = desc + "\n\n" + "\n".join(cta)
     args.description = desc

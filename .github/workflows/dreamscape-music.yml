@@ -68,7 +68,7 @@ jobs:
             --description "$(cat description.txt)" --tags "$(cat tags.txt)" \
             --privacy public --thumbnail output/thumbnail.jpg --url-out youtube_url.txt \
             --playlist PLX0z3_uqHkc2NujR-UyNFbbBJXobaz2Bw --channel-id UCvd4nL04uE7lFqkKtzsOwLg \
-            --affiliate "🎧 我愛用的降噪耳機 Soundcore Q20i (relax & sleep) → https://www.amazon.com/dp/B0C3HCD34R?tag=ytstories0413-20" || true
+            --affiliate "🎧 我愛用的降噪耳機 Soundcore Q20i (relax & sleep) → https://www.amazon.com/dp/B0C3HCD34R?tag=ytstories0413-20" --kofi https://ko-fi.com/ytstories0413 || true
 
       - name: 6) Notify Discord (success)
         if: success()
