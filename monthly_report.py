@@ -29,7 +29,7 @@ else:
 wh=os.environ.get("DISCORD_WEBHOOK")
 if wh:
     data=json.dumps({"content":body[:1900]}).encode("utf-8")
-    req=urllib.request.Request(wh,data=data,headers={"Content-Type":"application/json"})
+    req=urllib.request.Request(wh,data=data,headers={"Content-Type":"application/json","User-Agent":"Mozilla/5.0 (compatible; sm413-report-bot)"})
     urllib.request.urlopen(req,timeout=20); print("posted to discord")
 else:
     print("no webhook set")
