@@ -33,6 +33,18 @@ if wh:
     urllib.request.urlopen(req,timeout=20); print("posted to discord")
 else:
     print("no webhook set")
+gpw=os.environ.get("GMAIL_APP_PASSWORD")
+if gpw:
+    import smtplib
+    from email.mime.text import MIMEText
+    to_addr="slashman413@gmail.com"
+    em=MIMEText(body,"plain","utf-8")
+    em["Subject"]="每月網站報表 "+date.today().strftime("%Y-%m")
+    em["From"]=to_addr; em["To"]=to_addr
+    try:
+        srv=smtplib.SMTP("smtp.gmail.com",587,timeout=30); srv.starttls(); srv.login(to_addr,gpw); srv.sendmail(to_addr,[to_addr],em.as_string()); srv.quit(); print("email sent")
+    except Exception as e:
+        print("email failed:",e)
 with open("views_snapshot.json","w",encoding="utf-8") as f:
     json.dump(cur,f,ensure_ascii=False)
 print(body)
