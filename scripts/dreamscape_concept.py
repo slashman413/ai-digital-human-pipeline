@@ -27,7 +27,7 @@ PROMPT = (
     'calm/atmospheric) — must be relevant but NOT a fixed boilerplate; <=80 chars>",'
     '"music_prompt":"<MusicGen prompt: dark atmospheric ambient, slow, ethereal reverb pads, '
     'no drums, plus 2-3 mood words>",'
-    '"image_prompts":["<6 distinct dark dreamscape SCENES: snowy cabins, frozen lakes, foggy '
+    '"image_prompts":["<10 distinct dark dreamscape SCENES: snowy cabins, frozen lakes, foggy '
     'forests, empty winter roads, aurora, lonely mountains — one short phrase each>"],'
     '"description":"<short youtube description: mood line + \'perfect for sleep, study, relax\' + '
     '3 lines + 5 #hashtags like #ambient #darkambient #sleep #study #relax>",'
@@ -43,6 +43,10 @@ FALLBACK_SCENES = [
     "misty pine forest at blue hour, deep snow, fog between trees",
     "abandoned cabin in a vast snowfield, northern lights overhead",
     "quiet mountain village at night, warm window lights, heavy snowfall",
+    "snow-covered evergreen forest under a full moon, soft blue light, mist",
+    "icy fjord at twilight, calm water reflecting purple sky, distant cabin",
+    "cozy cabin window from inside, frost on glass, candle glow, snowfall outside",
+    "endless snowy plain at night, faint green aurora, a single distant light",
 ]
 
 
@@ -101,18 +105,21 @@ def main() -> int:
     seo = str(d.get("seo_title") or "").strip()
     if not seo or len(seo) < len(title_l) + 3:
         seo = f"{title_l} | {random.choice(SEO_SUFFIXES)}"
+    if "min" not in seo.lower() and "hour" not in seo.lower():
+        seo = seo.strip() + " | 20 Min Dark Ambient"
+    seo = seo[:1].upper() + seo[1:]
     with open(os.path.join(o, "yt_title.txt"), "w", encoding="utf-8") as fh:
         fh.write(seo)
     with open(os.path.join(o, "music_prompt.txt"), "w", encoding="utf-8") as fh:
         fh.write(str(d.get("music_prompt") or fallback()["music_prompt"]))
     with open(os.path.join(o, "prompts.txt"), "w", encoding="utf-8") as fh:
-        fh.write("\n".join(str(p).strip() for p in d["image_prompts"][:6]))
+        fh.write("\n".join(str(p).strip() for p in d["image_prompts"][:10]))
     with open(os.path.join(o, "description.txt"), "w", encoding="utf-8") as fh:
         fh.write(str(d.get("description") or fallback()["description"]))
     tags = d.get("tags") or fallback()["tags"]
     with open(os.path.join(o, "tags.txt"), "w", encoding="utf-8") as fh:
         fh.write(",".join(str(t).strip() for t in tags[:15]))
-    print(f"[concept] title={d['title']!r}  scenes={len(d['image_prompts'][:6])}")
+    print(f"[concept] title={d['title']!r}  scenes={len(d['image_prompts'][:10])}")
     return 0
 
 
