@@ -95,6 +95,7 @@ def ken_burns_segment(img: str, out: str, dur: float, zoom_in: bool) -> None:
 
 
 def main() -> int:
+    global W, H
     ap = argparse.ArgumentParser()
     ap.add_argument("--music", required=True)
     ap.add_argument("--prompts-file", required=True)
@@ -108,13 +109,21 @@ def main() -> int:
                     help="target seconds each scene is shown before crossfading (transition cadence)")
     ap.add_argument("--end-fade", type=float, default=4.0,
                     help="seconds of audio fade-out at the very end (0 = none, for a seamless loop base)")
+    ap.add_argument("--width", type=int, default=W, help="output width (use 1080 for a 9:16 Short)")
+    ap.add_argument("--height", type=int, default=H, help="output height (use 1920 for a 9:16 Short)")
     ap.add_argument("--loop-to", type=float, default=0,
                     help="if music is shorter than this many seconds, seamlessly loop it up to it")
     ap.add_argument("--snow", default="",
                     help="path to a tall snow texture PNG; overlaid as gentle falling snow")
     ap.add_argument("--nature", default="",
                     help="path to a nature ambience clip (water+birds); looped and mixed under the music")
+    ap.add_argument("--nature-volume", type=float, default=0.75,
+                    help="volume of the nature ambience in the mix (water/birds audibility)")
+    ap.add_argument("--music-volume", type=float, default=0.8,
+                    help="volume of the music in the mix")
     args = ap.parse_args()
+
+    W, H = args.width, args.height  # supports vertical 9:16 Shorts (1080x1920)
 
     os.makedirs(args.workdir, exist_ok=True)
     os.makedirs(os.path.dirname(args.output) or ".", exist_ok=True)
@@ -134,11 +143,12 @@ def main() -> int:
         subprocess.run(
             ["ffmpeg", "-y", "-i", args.music, "-stream_loop", "-1", "-i", args.nature,
              "-filter_complex",
-             "[0:a]volume=1.0[m];[1:a]volume=0.45,afade=t=in:st=0:d=2[n];"
-             "[m][n]amix=inputs=2:duration=first:normalize=0[a]",
+             f"[0:a]volume={args.music_volume}[m];[1:a]volume={args.nature_volume},afade=t=in:st=0:d=2[n];"
+             "[m][n]amix=inputs=2:duration=first:normalize=0,alimiter=limit=0.95[a]",
              "-map", "[a]", "-t", f"{music_dur}", mixed], check=True, capture_output=True)
         args.music = mixed
-        print(f"[mv] mixed nature ambience '{os.path.basename(args.nature)}' under music")
+        print(f"[mv] mixed nature ambience '{os.path.basename(args.nature)}' "
+              f"(music={args.music_volume}, nature={args.nature_volume}) under music")
 
     prompts = [ln.strip() for ln in open(args.prompts_file, encoding="utf-8") if ln.strip()]
     if not prompts:
