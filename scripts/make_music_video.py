@@ -104,6 +104,8 @@ def main() -> int:
     ap.add_argument("--font", default="")          # fontconfig name (runner)
     ap.add_argument("--fontfile", default="")       # explicit file (Windows)
     ap.add_argument("--xfade", type=float, default=2.5)
+    ap.add_argument("--seg-seconds", type=float, default=25.0,
+                    help="target seconds each scene is shown before crossfading (transition cadence)")
     ap.add_argument("--loop-to", type=float, default=0,
                     help="if music is shorter than this many seconds, seamlessly loop it up to it")
     ap.add_argument("--snow", default="",
@@ -139,27 +141,41 @@ def main() -> int:
     prompts = [ln.strip() for ln in open(args.prompts_file, encoding="utf-8") if ln.strip()]
     if not prompts:
         prompts = ["calm misty lake at sunrise, soft golden light, gentle reflections"]
-    n = len(prompts)
 
-    # each image visible for seg_dur; segments overlap by xfade so total == music_dur
-    xf = args.xfade
-    seg_dur = (music_dur + xf * (n - 1)) / n
-    seg_dur = max(seg_dur, xf + 2)
-
-    rng = random.Random(7)
-    segs = []
+    # fetch one image per unique prompt (cheap; reused across segments below)
+    images = []
     for i, p in enumerate(prompts):
         img = os.path.join(args.workdir, f"img_{i:02d}.jpg")
-        if not fetch_image(p, img, seed=100 + i * 7):
+        if os.path.exists(img) and os.path.getsize(img) > 5000:
+            images.append(img)  # reuse (retry / local re-run); CI workdir is always fresh
+        elif fetch_image(p, img, seed=100 + i * 7):
+            images.append(img)
+        else:
             print(f"[mv] image {i} failed; skipping")
-            continue
-        seg = os.path.join(args.workdir, f"seg_{i:02d}.mp4")
+    if not images:
+        print("[mv] ERROR: no images")
+        return 1
+
+    # transition cadence is driven by --seg-seconds (not image count), so a 20-min track
+    # gets a cut every ~25s instead of 10 huge 2-min scenes. Images are cycled to fill.
+    xf = args.xfade
+    target = max(args.seg_seconds, xf + 4)
+    # cadence drives the count (not image count); short clips use a subset, long ones cycle
+    num_seg = max(2, round((music_dur - xf) / max(1.0, target - xf)))
+    seg_dur = (music_dur + xf * (num_seg - 1)) / num_seg
+    seg_dur = max(seg_dur, xf + 2)
+
+    segs = []
+    for i in range(num_seg):
+        img = images[i % len(images)]
+        seg = os.path.join(args.workdir, f"seg_{i:03d}.mp4")
         ken_burns_segment(img, seg, seg_dur, zoom_in=(i % 2 == 0))
         segs.append(seg)
-        print(f"[mv] segment {i:02d} ({seg_dur:.1f}s)")
+    print(f"[mv] {num_seg} scenes x {seg_dur:.1f}s (cadence ~{seg_dur - xf:.0f}s) from {len(images)} images")
     if not segs:
         print("[mv] ERROR: no segments")
         return 1
+    rng = random.Random(7)
 
     # crossfade-chain the segments
     silent = os.path.join(args.workdir, "video_silent.mp4")
