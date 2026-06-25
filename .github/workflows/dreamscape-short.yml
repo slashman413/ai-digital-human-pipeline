@@ -1,0 +1,94 @@
+name: Dreamscape Short (vertical)
+
+# A ~30s vertical (9:16) YouTube Short in the lakeside meditation-piano style.
+on:
+  workflow_dispatch:
+    inputs:
+      seconds:
+        description: "short length in seconds (<= 60 for a Short)"
+        default: "30"
+      publish:
+        description: "publish to YouTube (false = build only)"
+        default: "false"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install ffmpeg + fonts + deps
+        run: |
+          sudo apt-get update && sudo apt-get install -y ffmpeg fonts-dejavu-core
+          pip install -r requirements.txt google-api-python-client google-auth google-auth-oauthlib
+
+      - name: 1) Concept (title + music/image prompts + SEO)
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          python scripts/dreamscape_concept.py --outdir .
+          SHORT=$(cat title.txt)
+          CAP=$(python -c "import sys;t=sys.argv[1].strip();print(t[:1].upper()+t[1:])" "$SHORT")
+          echo "${CAP} 🌅 Relaxing Piano & Nature Sounds 🎹 #shorts #relaxingmusic #meditation" > yt_title.txt
+          printf "%s — soft piano with gentle water & birdsong.\n\n#shorts #relaxingmusic #meditation #pianomusic #naturesounds #sleep" "$CAP" > description.txt
+          echo "shorts,$(cat tags.txt)" > tags.txt
+          echo "SEO: $(cat yt_title.txt)"
+
+      - name: 2) Generate meditation piano music (Replicate MusicGen)
+        env:
+          REPLICATE_API_TOKEN: ${{ secrets.REPLICATE_API_TOKEN }}
+        run: |
+          python scripts/generate_music.py --prompt "$(cat music_prompt.txt)" \
+            --duration "${{ inputs.seconds }}" --model-version stereo-large \
+            --output-format wav --output output/music.wav
+
+      - name: 3) Assemble vertical Short (1080x1920, piano + audible water/birds)
+        run: |
+          python scripts/make_music_video.py --music output/music.wav \
+            --prompts-file prompts.txt --title "$(cat title.txt)" \
+            --output output/video.mp4 --workdir build_mv --font "DejaVu Sans" \
+            --width 1080 --height 1920 --seg-seconds 12 --end-fade 2 \
+            --nature assets/nature.mp3
+          echo "len: $(ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 output/video.mp4)s"
+
+      - name: 4) Publish Short to YouTube
+        env:
+          YOUTUBE_CLIENT_ID: ${{ inputs.publish != 'false' && secrets.YOUTUBE_CLIENT_ID || '' }}
+          YOUTUBE_CLIENT_SECRET: ${{ inputs.publish != 'false' && secrets.YOUTUBE_CLIENT_SECRET || '' }}
+          YOUTUBE_REFRESH_TOKEN: ${{ inputs.publish != 'false' && secrets.YOUTUBE_REFRESH_TOKEN || '' }}
+        run: |
+          python scripts/upload_youtube.py --video output/video.mp4 \
+            --title "$(cat yt_title.txt)" \
+            --description "$(cat description.txt)" --tags "$(cat tags.txt)" \
+            --privacy public --url-out youtube_url.txt \
+            --channel-id UCvd4nL04uE7lFqkKtzsOwLg \
+            --kofi https://ko-fi.com/ytstories0413 || true
+
+      - name: 5) Notify Discord
+        if: success()
+        env:
+          WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        run: |
+          if [ -n "$WEBHOOK" ]; then
+            URL=$(cat youtube_url.txt 2>/dev/null || echo "")
+            curl -s -H "Content-Type: application/json" \
+              -d "{\"content\":\"🎬 dreamscape short：$(cat title.txt 2>/dev/null) $URL\"}" "$WEBHOOK"
+          fi
+
+      - name: Upload artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dreamscape-short
+          path: |
+            output/video.mp4
+            output/music.wav
+            yt_title.txt
+            description.txt
+          retention-days: 7
