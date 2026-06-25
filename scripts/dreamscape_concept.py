@@ -25,8 +25,8 @@ PROMPT = (
     '"seo_title":"<a YouTube title: the title + a VARIED descriptive tail using different wording '
     'each time (mix of: relaxing piano, meditation music, nature sounds, for sleep/study/relax/focus, lake/forest/morning, '
     'calm/atmospheric) — must be relevant but NOT a fixed boilerplate; <=80 chars>",'
-    '"music_prompt":"<MusicGen prompt: soft gentle solo piano, peaceful meditation music, calm warm soothing, slow, with gentle flowing water and birdsong, '
-    'no drums, plus 2-3 mood words>",'
+    '"music_prompt":"<MusicGen prompt: solo acoustic grand piano only, gentle slow meditative piano melody, intimate warm, '
+    'clearly recognizable acoustic piano, soft dynamics, no synth, no pads, no strings, no drums, plus 2-3 mood words>",'
     '"image_prompts":["<10 distinct serene NATURE meditation SCENES: misty lake at sunrise, forest stream, sunlit '
     'trees, calm reflective water, green meadow morning, gentle waterfall, lakeside dawn — one short phrase each>"],'
     '"description":"<short youtube description: mood line + \'perfect for sleep, study, relax\' + '
@@ -72,7 +72,7 @@ def fallback() -> dict:
     return {
         "title": title,
         "seo_title": f"{title} | {rng.choice(SEO_SUFFIXES)}",
-        "music_prompt": "soft gentle solo piano, peaceful meditation music, calm warm soothing, slow, with gentle flowing water and distant birdsong, relaxing, emotional, no drums, no percussion",
+        "music_prompt": "solo acoustic grand piano only, gentle slow meditative piano melody, intimate warm, clearly recognizable acoustic piano, soft dynamics, calm, emotional, no synth, no pads, no strings, no drums, no percussion",
         "image_prompts": FALLBACK_SCENES,
         "description": (f"{title} — soft piano meditation music with gentle water & birdsong, for sleep, study and relaxation.\n\n"
                         "let the piano and nature sounds calm your mind.\nput it on, breathe, and let go.\n\n"
