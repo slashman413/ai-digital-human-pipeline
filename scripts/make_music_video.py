@@ -1,11 +1,13 @@
-"""Assemble a dreamscape-style ambient music video.
+"""Assemble a serene nature meditation music video.
 
-Fetches dark dreamscape images (Pollinations), gives each a slow smooth Ken Burns
-move, crossfades between them, overlays a small spaced lowercase title, and muxes
-a music track — trimmed to the music length with a gentle audio fade-out. 1080p.
+Fetches calm nature images (Pollinations), gives each a slow smooth Ken Burns
+move, crossfades between them, overlays a small spaced lowercase title, optionally
+mixes a real water+birdsong ambience under the piano, and muxes the music track —
+trimmed to the music length with a gentle audio fade-out. 1080p.
 
-CLI: --music output/music.mp3 --prompts-file prompts.txt --title "first snow"
-     --output output/video.mp4 [--font "Noto Sans CJK TC" | --fontfile C:/Windows/Fonts/...]
+CLI: --music output/music.wav --prompts-file prompts.txt --title "morning lake"
+     --output output/video.mp4 [--nature assets/nature.mp3]
+     [--font "Noto Sans CJK TC" | --fontfile C:/Windows/Fonts/...]
 prompts-file: one image prompt per line.
 """
 from __future__ import annotations
@@ -20,8 +22,9 @@ import urllib.parse
 import urllib.request
 
 W, H, FPS = 1920, 1080, 30
-STYLE = ("dark moody atmospheric, deep teal and blue color grade, misty, cinematic, "
-         "melancholic, film grain, lonely, dreamy, highly detailed, no text, no watermark")
+STYLE = ("serene peaceful nature, soft natural morning light, calm and tranquil, "
+         "lush greens and gentle warm tones, light mist, cinematic, dreamy, soothing, "
+         "highly detailed, no text, no watermark")
 
 
 def fetch_image(prompt: str, path: str, seed: int) -> bool:
@@ -105,6 +108,8 @@ def main() -> int:
                     help="if music is shorter than this many seconds, seamlessly loop it up to it")
     ap.add_argument("--snow", default="",
                     help="path to a tall snow texture PNG; overlaid as gentle falling snow")
+    ap.add_argument("--nature", default="",
+                    help="path to a nature ambience clip (water+birds); looped and mixed under the music")
     args = ap.parse_args()
 
     os.makedirs(args.workdir, exist_ok=True)
@@ -119,9 +124,21 @@ def main() -> int:
         args.music = loop_audio(args.music, looped, args.loop_to)
         music_dur = ffprobe_duration(args.music)
 
+    # mix real water+birdsong ambience under the piano (looped to full length, kept quieter)
+    if args.nature and os.path.isfile(args.nature):
+        mixed = os.path.join(args.workdir, "music_nature.wav")
+        subprocess.run(
+            ["ffmpeg", "-y", "-i", args.music, "-stream_loop", "-1", "-i", args.nature,
+             "-filter_complex",
+             "[0:a]volume=1.0[m];[1:a]volume=0.45,afade=t=in:st=0:d=2[n];"
+             "[m][n]amix=inputs=2:duration=first:normalize=0[a]",
+             "-map", "[a]", "-t", f"{music_dur}", mixed], check=True, capture_output=True)
+        args.music = mixed
+        print(f"[mv] mixed nature ambience '{os.path.basename(args.nature)}' under music")
+
     prompts = [ln.strip() for ln in open(args.prompts_file, encoding="utf-8") if ln.strip()]
     if not prompts:
-        prompts = ["lone cabin glowing windows on a snowy hill at night, faint aurora"]
+        prompts = ["calm misty lake at sunrise, soft golden light, gentle reflections"]
     n = len(prompts)
 
     # each image visible for seg_dur; segments overlap by xfade so total == music_dur
