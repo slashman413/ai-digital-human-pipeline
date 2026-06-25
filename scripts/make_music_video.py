@@ -106,6 +106,8 @@ def main() -> int:
     ap.add_argument("--xfade", type=float, default=2.5)
     ap.add_argument("--seg-seconds", type=float, default=25.0,
                     help="target seconds each scene is shown before crossfading (transition cadence)")
+    ap.add_argument("--end-fade", type=float, default=4.0,
+                    help="seconds of audio fade-out at the very end (0 = none, for a seamless loop base)")
     ap.add_argument("--loop-to", type=float, default=0,
                     help="if music is shorter than this many seconds, seamlessly loop it up to it")
     ap.add_argument("--snow", default="",
@@ -212,8 +214,11 @@ def main() -> int:
         draw = (f"drawtext={font}:text='{txt}':fontcolor=white@0.82:fontsize=34:"
                 f"x=(w-text_w)/2:y=(h-text_h)/2:shadowcolor=black@0.4:shadowx=1:shadowy=1")
 
-    fade_start = max(0.0, music_dur - 4)
-    afilter = f"afade=t=out:st={fade_start:.2f}:d=4"
+    if args.end_fade and args.end_fade > 0:
+        fade_start = max(0.0, music_dur - args.end_fade)
+        afilter = f"afade=t=out:st={fade_start:.2f}:d={args.end_fade}"
+    else:
+        afilter = "anull"  # seamless loop base: no end fade
     has_snow = bool(args.snow and os.path.isfile(args.snow))
 
     if has_snow:
