@@ -14,39 +14,39 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from llm import complete  # noqa: E402
 
-SYS = ("You are a creative director for an ethereal dark-ambient music channel "
-       "(think Øneheart, Antent, 'made from dreams' — calm, mysterious, emotional, cinematic). "
+SYS = ("You are a creative director for a peaceful piano meditation & relaxation music channel "
+       "(soft solo piano, lakeside calm, gentle nature ambience — warm, soothing, meditative). "
        "Output strict JSON only.")
 
 PROMPT = (
-    "Design ONE short ambient track concept in the style of the YouTube channel 'dreamscape..' "
-    "(dark, melancholic, lonely, cinematic, snowy/winter night mood). Strict JSON:\n"
-    '{"title":"<2-3 word lowercase melancholic title, e.g. first snow / distant memories>",'
+    "Design ONE short peaceful piano meditation track concept (soft solo piano with gentle water & birdsong) "
+    "(lakeside / forest, calm, warm, for meditation & relaxation). Strict JSON:\n"
+    '{"title":"<2-3 word lowercase calm nature title, e.g. morning lake / quiet stream>",'
     '"seo_title":"<a YouTube title: the title + a VARIED descriptive tail using different wording '
-    'each time (mix of: dark/ethereal ambient, for sleep/study/relax/focus, winter/snow/night, '
+    'each time (mix of: relaxing piano, meditation music, nature sounds, for sleep/study/relax/focus, lake/forest/morning, '
     'calm/atmospheric) — must be relevant but NOT a fixed boilerplate; <=80 chars>",'
-    '"music_prompt":"<MusicGen prompt: dark atmospheric ambient, slow, ethereal reverb pads, '
+    '"music_prompt":"<MusicGen prompt: soft gentle solo piano, peaceful meditation music, calm warm soothing, slow, with gentle flowing water and birdsong, '
     'no drums, plus 2-3 mood words>",'
-    '"image_prompts":["<10 distinct dark dreamscape SCENES: snowy cabins, frozen lakes, foggy '
-    'forests, empty winter roads, aurora, lonely mountains — one short phrase each>"],'
+    '"image_prompts":["<10 distinct serene NATURE meditation SCENES: misty lake at sunrise, forest stream, sunlit '
+    'trees, calm reflective water, green meadow morning, gentle waterfall, lakeside dawn — one short phrase each>"],'
     '"description":"<short youtube description: mood line + \'perfect for sleep, study, relax\' + '
-    '3 lines + 5 #hashtags like #ambient #darkambient #sleep #study #relax>",'
-    '"tags":["<12-15 SEO tags: dark ambient, ambient music, sleep music, study music, etc>"]}'
+    '3 lines + 5 #hashtags like #meditation #pianomusic #relaxingmusic #naturesounds #sleep>",'
+    '"tags":["<12-15 SEO tags: meditation music, relaxing piano, piano music, nature sounds, water sounds, birdsong, sleep music, study music, etc>"]}'
 )
 
-FALLBACK_TITLES = ["first snow", "distant memories", "fading light", "winter solitude",
-                   "lonely night", "frozen time", "silent dreams", "after the storm"]
+FALLBACK_TITLES = ["morning lake", "quiet stream", "forest light", "still water",
+                   "gentle dawn", "soft current", "misty morning", "calm waters"]
 FALLBACK_SCENES = [
-    "lone wooden cabin glowing windows on a snowy hill at night, faint aurora",
-    "frozen lake under a starry winter night, distant mountains, mist",
-    "empty snowy forest path at dusk, soft falling snow, lonely lamppost",
-    "misty pine forest at blue hour, deep snow, fog between trees",
-    "abandoned cabin in a vast snowfield, northern lights overhead",
-    "quiet mountain village at night, warm window lights, heavy snowfall",
-    "snow-covered evergreen forest under a full moon, soft blue light, mist",
-    "icy fjord at twilight, calm water reflecting purple sky, distant cabin",
-    "cozy cabin window from inside, frost on glass, candle glow, snowfall outside",
-    "endless snowy plain at night, faint green aurora, a single distant light",
+    "calm misty lake at sunrise, soft golden light, gentle reflections, distant forest",
+    "clear forest stream over mossy rocks, dappled morning sunlight, lush green",
+    "sunlight beams through tall green trees, soft fog, peaceful woodland path",
+    "still mountain lake reflecting pink dawn sky, mist on the water, serene",
+    "gentle waterfall in a green forest, soft mist, ferns, tranquil",
+    "quiet green meadow at golden hour, wildflowers, soft warm light",
+    "lakeside dawn, a single wooden jetty, calm water, birds in the sky",
+    "soft sunrise over rolling green hills, light mist in the valley",
+    "peaceful riverbank with reeds and warm morning light, smooth water",
+    "tranquil pond in a zen garden, lily pads, soft reflections, calm",
 ]
 
 
@@ -59,10 +59,10 @@ def parse_json(text: str) -> dict:
 
 
 SEO_SUFFIXES = [
-    "dark ambient for deep sleep", "ethereal ambient to study & relax",
-    "calm winter ambient music", "atmospheric ambient for sleep & focus",
-    "dreamy dark ambient music", "ambient soundscape to relax & unwind",
-    "snowy night ambient for sleep", "lonely dark ambient to study",
+    "relaxing piano music for meditation", "soft piano with nature sounds for sleep",
+    "calm piano & water sounds to study & relax", "peaceful piano for deep relaxation",
+    "meditation music with birdsong & stream", "gentle piano music to unwind",
+    "relaxing piano for sleep & focus", "calming piano with nature ambience",
 ]
 
 
@@ -72,14 +72,14 @@ def fallback() -> dict:
     return {
         "title": title,
         "seo_title": f"{title} | {rng.choice(SEO_SUFFIXES)}",
-        "music_prompt": "ethereal dark ambient, slow, calm, mysterious, emotional, lush reverb pads, dreamy, cinematic, no drums, no percussion",
+        "music_prompt": "soft gentle solo piano, peaceful meditation music, calm warm soothing, slow, with gentle flowing water and distant birdsong, relaxing, emotional, no drums, no percussion",
         "image_prompts": FALLBACK_SCENES,
-        "description": (f"{title} — dark ambient music for sleep, study and relaxation.\n\n"
-                        "drift away into a quiet winter dream.\nput it on, breathe, and let go.\n\n"
-                        "#ambient #darkambient #sleep #study #relax"),
-        "tags": ["dark ambient", "ambient music", "sleep music", "study music", "relaxing music",
-                 "winter ambient", "snowfall", "calm music", "dreamscape", "lonely ambient",
-                 "background music", "focus music", "ambient mix", "chill"],
+        "description": (f"{title} — soft piano meditation music with gentle water & birdsong, for sleep, study and relaxation.\n\n"
+                        "let the piano and nature sounds calm your mind.\nput it on, breathe, and let go.\n\n"
+                        "#meditation #pianomusic #relaxingmusic #naturesounds #sleep"),
+        "tags": ["meditation music", "relaxing piano", "piano music", "nature sounds", "water sounds",
+                 "birdsong", "sleep music", "study music", "calm music", "relaxing music",
+                 "background music", "focus music", "spa music", "stress relief"],
     }
 
 
@@ -106,7 +106,7 @@ def main() -> int:
     if not seo or len(seo) < len(title_l) + 3:
         seo = f"{title_l} | {random.choice(SEO_SUFFIXES)}"
     if "min" not in seo.lower() and "hour" not in seo.lower():
-        seo = seo.strip() + " | 20 Min Dark Ambient"
+        seo = seo.strip() + " | 20 Min Relaxing Piano"
     seo = seo[:1].upper() + seo[1:]
     with open(os.path.join(o, "yt_title.txt"), "w", encoding="utf-8") as fh:
         fh.write(seo)
