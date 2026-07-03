@@ -1,0 +1,56 @@
+name: YouTube Auth Check
+# Lightweight verification of the YOUTUBE_* secrets: refresh the OAuth token and
+# call channels.list(mine=True). No video generation — finishes in seconds.
+# Use this to confirm auth before spending on a full daily-auto render.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  auth-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Google client libs
+        run: pip install --quiet google-auth google-auth-oauthlib google-api-python-client
+
+      - name: Verify YouTube OAuth
+        env:
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+        run: |
+          python - <<'PY'
+          import os
+          from google.oauth2.credentials import Credentials
+          from google.auth.transport.requests import Request
+          from googleapiclient.discovery import build
+
+          for k in ("YOUTUBE_CLIENT_ID", "YOUTUBE_CLIENT_SECRET", "YOUTUBE_REFRESH_TOKEN"):
+              if not os.environ.get(k):
+                  raise SystemExit(f"::error::missing secret {k}")
+
+          creds = Credentials(
+              None,
+              refresh_token=os.environ["YOUTUBE_REFRESH_TOKEN"],
+              token_uri="https://oauth2.googleapis.com/token",
+              client_id=os.environ["YOUTUBE_CLIENT_ID"],
+              client_secret=os.environ["YOUTUBE_CLIENT_SECRET"],
+              scopes=["https://www.googleapis.com/auth/youtube.upload",
+                      "https://www.googleapis.com/auth/youtube.force-ssl"],
+          )
+          creds.refresh(Request())
+          print("token refresh: OK (access token acquired)")
+
+          yt = build("youtube", "v3", credentials=creds)
+          items = yt.channels().list(part="snippet", mine=True).execute().get("items", [])
+          if not items:
+              raise SystemExit("::error::auth OK but no channel returned for this account/scope")
+          print("AUTH OK ->", items[0]["snippet"]["title"], "| channelId:", items[0]["id"])
+          PY
