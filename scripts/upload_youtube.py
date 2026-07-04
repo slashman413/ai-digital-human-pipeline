@@ -8,6 +8,29 @@ import argparse
 import os
 import sys
 
+# ---------------------------------------------------------------------------
+# Product CTA — appended once to every description (idempotent).
+# {SRC} = upload platform slug, {CAMP} = campaign name.
+# ---------------------------------------------------------------------------
+_CTA_MARKER = "slashman413-cta-v1"
+_CTA_TEMPLATE = (
+    "\n\n"
+    "🛠 SaaS Starter — ship a multi-tenant SaaS this weekend:\n"
+    "https://slashman413.gumroad.com/l/saas-starter"
+    "?utm_source={src}&utm_medium=video&utm_campaign={camp}\n"
+    "📈 台股大飆股 DNA 量化訊號（免費回測＋每日精選）:\n"
+    "https://slashman413.github.io/twse-backtests/"
+    "?utm_source={src}&utm_medium=video&utm_campaign={camp}\n"
+    f"<!-- {_CTA_MARKER} -->"
+)
+
+
+def _append_cta(desc: str, src: str, camp: str = "ai-digital-human-pipeline") -> str:
+    """Append the product CTA to *desc* unless already present."""
+    if _CTA_MARKER in desc:
+        return desc
+    return desc.rstrip() + _CTA_TEMPLATE.format(src=src, camp=camp)
+
 
 def main():
     parser = argparse.ArgumentParser(description="Upload a video to YouTube.")
@@ -27,7 +50,7 @@ def main():
 
     tags = [t.strip() for t in args.tags.split(",") if t.strip()]
 
-    desc = args.description.rstrip()
+    desc = _append_cta(args.description.rstrip(), src="youtube")
 
     # C: place the Amazon affiliate recommendation near the TOP (visible in the collapsed
     # description = far more clicks) right after the hook line, with the required disclosure.

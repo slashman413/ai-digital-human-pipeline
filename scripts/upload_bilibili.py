@@ -22,6 +22,28 @@ import shutil
 import subprocess
 import sys
 
+# ---------------------------------------------------------------------------
+# Product CTA — appended once to every description (idempotent).
+# ---------------------------------------------------------------------------
+_CTA_MARKER = "slashman413-cta-v1"
+_CTA_TEMPLATE = (
+    "\n\n"
+    "🛠 SaaS Starter — ship a multi-tenant SaaS this weekend:\n"
+    "https://slashman413.gumroad.com/l/saas-starter"
+    "?utm_source={src}&utm_medium=video&utm_campaign={camp}\n"
+    "📈 台股大飆股 DNA 量化訊號（免費回測＋每日精選）:\n"
+    "https://slashman413.github.io/twse-backtests/"
+    "?utm_source={src}&utm_medium=video&utm_campaign={camp}\n"
+    f"<!-- {_CTA_MARKER} -->"
+)
+
+
+def _append_cta(desc: str, src: str, camp: str = "ai-digital-human-pipeline") -> str:
+    """Append the product CTA to *desc* unless already present."""
+    if _CTA_MARKER in desc:
+        return desc
+    return desc.rstrip() + _CTA_TEMPLATE.format(src=src, camp=camp)
+
 
 def _dry_run(reason: str, video: str, title: str, desc: str, tags: list[str]) -> None:
     print(f"[warn] Bilibili DRY RUN ({reason}). Would post:")
@@ -40,6 +62,7 @@ def main() -> int:
     ap.add_argument("--tags", default="")
     args = ap.parse_args()
     tags = [t.strip() for t in args.tags.split(",") if t.strip()]
+    args.description = _append_cta(args.description, src="bilibili")
 
     cookies = os.getenv("BILIBILI_COOKIES")
     biliup = shutil.which("biliup")
