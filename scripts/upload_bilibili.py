@@ -29,7 +29,7 @@ _CTA_MARKER = "slashman413-cta-v1"
 _CTA_TEMPLATE = (
     "\n\n"
     "🛠 SaaS Starter — ship a multi-tenant SaaS this weekend:\n"
-    "https://slashman413.gumroad.com/l/saas-starter"
+    "https://slashmaster6.gumroad.com/l/kuvajr"
     "?utm_source={src}&utm_medium=video&utm_campaign={camp}\n"
     "📈 台股大飆股 DNA 量化訊號（免費回測＋每日精選）:\n"
     "https://slashman413.github.io/twse-backtests/"
