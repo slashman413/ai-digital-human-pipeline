@@ -4,6 +4,11 @@ name: YouTube Auth Check
 # Use this to confirm auth before spending on a full daily-auto render.
 on:
   workflow_dispatch:
+  # Also run on pushes that touch this workflow, so YouTube OAuth is re-validated
+  # whenever the auth setup changes (cheap — the check finishes in seconds).
+  push:
+    paths:
+      - ".github/workflows/yt-auth-check.yml"
 
 permissions:
   contents: read
