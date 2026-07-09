@@ -40,11 +40,25 @@ jobs:
   # 🔐 Resolve YouTube credentials from central auth hub
   # ─────────────────────────────────────────────────────────────────────
   auth:
-    uses: slashman413/youtube-auth-central/.github/workflows/get-credentials.yml@main
-    with:
-      client: ai-digital-human
-    secrets:
-      auth_token: ${{ secrets.YT_AUTH_TOKEN }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      client_id: ${{ steps.resolve.outputs.client_id }}
+      client_secret: ${{ steps.resolve.outputs.client_secret }}
+      refresh_token: ${{ steps.resolve.outputs.refresh_token }}
+      channel_id: ${{ steps.resolve.outputs.channel_id }}
+      zh_playlist: ${{ steps.resolve.outputs.zh_playlist }}
+      en_playlist: ${{ steps.resolve.outputs.en_playlist }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: slashman413/youtube-auth-central
+          token: ${{ secrets.YT_AUTH_TOKEN }}
+          path: .central
+
+      - id: resolve
+        shell: bash
+        run: .central/scripts/resolve-credentials.sh ai-digital-human
 
   # ─────────────────────────────────────────────────────────────────────
   # 🎬 Main pipeline
