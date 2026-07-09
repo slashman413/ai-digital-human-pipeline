@@ -2,6 +2,8 @@
 # 每天自動：抓 Google Trends 熱門主題 → DeepSeek 寫腳本 → 仿真背景圖 + 台灣腔配音
 # → 合成 720p 影片 → 自動發布到三平台 → Discord 通知。
 # 缺某平台憑證時該平台自動 dry-run，不影響其他平台。
+#
+# YouTube 憑證集中管理：https://github.com/slashman413/youtube-auth-central
 name: Daily Auto Publish
 
 on:
@@ -34,9 +36,30 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # ─────────────────────────────────────────────────────────────────────
+  # 🔐 Resolve YouTube credentials from central auth hub
+  # ─────────────────────────────────────────────────────────────────────
+  auth:
+    uses: slashman413/youtube-auth-central/.github/workflows/get-credentials.yml@main
+    with:
+      client: ai-digital-human
+    secrets:
+      auth_token: ${{ secrets.YT_AUTH_TOKEN }}
+
+  # ─────────────────────────────────────────────────────────────────────
+  # 🎬 Main pipeline
+  # ─────────────────────────────────────────────────────────────────────
   auto:
+    needs: [auth]
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    # YouTube credentials come from auth job (central repo).
+    # On dry-run (publish=false) they're cleared → scripts auto-dry-run.
+    env:
+      YOUTUBE_CLIENT_ID: ${{ inputs.publish != 'false' && needs.auth.outputs.client_id || '' }}
+      YOUTUBE_CLIENT_SECRET: ${{ inputs.publish != 'false' && needs.auth.outputs.client_secret || '' }}
+      YOUTUBE_REFRESH_TOKEN: ${{ inputs.publish != 'false' && needs.auth.outputs.refresh_token || '' }}
+      YOUTUBE_CHANNEL_ID: ${{ inputs.publish != 'false' && needs.auth.outputs.channel_id || '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -50,6 +73,7 @@ jobs:
           curl -sL https://github.com/biliup/biliup-rs/releases/download/v0.2.4/biliupR-v0.2.4-x86_64-linux.tar.xz -o /tmp/biliup.tar.xz
           tar -xf /tmp/biliup.tar.xz -C /tmp
           sudo install -m 755 "$(find /tmp -maxdepth 2 -name biliup -type f | head -n1)" /usr/local/bin/biliup
+
       - name: Install Python deps
         run: pip install -r requirements.txt google-api-python-client google-auth google-auth-oauthlib
 
@@ -59,9 +83,6 @@ jobs:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
-          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
-          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
         run: |
           if [ -n "${{ inputs.topic }}" ]; then
             echo "${{ inputs.topic }}" > topic.txt
@@ -96,23 +117,15 @@ jobs:
 
       - name: 5a) Publish full video to YouTube (public)
         continue-on-error: true
-        env:
-          YOUTUBE_CLIENT_ID: ${{ inputs.publish != 'false' && secrets.YOUTUBE_CLIENT_ID || '' }}
-          YOUTUBE_CLIENT_SECRET: ${{ inputs.publish != 'false' && secrets.YOUTUBE_CLIENT_SECRET || '' }}
-          YOUTUBE_REFRESH_TOKEN: ${{ inputs.publish != 'false' && secrets.YOUTUBE_REFRESH_TOKEN || '' }}
-        run: python scripts/upload_youtube.py --video output/final_video.mp4 --title "$(cat title.txt)" --description "$(cat description.txt)" --tags "$(cat tags.txt)" --privacy public --url-out youtube_url.txt --thumbnail output/thumbnail.jpg --playlist PLX0z3_uqHkc2DNvIrjrP-t27brEOhwF1Z --channel-id UCvd4nL04uE7lFqkKtzsOwLg --affiliate "📚 推薦 AI 暢銷書 Co-Intelligence → https://www.amazon.com/dp/059371671X?tag=ytstories0413-20" --kofi https://ko-fi.com/ytstories0413
+        run: python scripts/upload_youtube.py --video output/final_video.mp4 --title "$(cat title.txt)" --description "$(cat description.txt)" --tags "$(cat tags.txt)" --privacy public --url-out youtube_url.txt --thumbnail output/thumbnail.jpg --playlist PLX0z3_uqHkc2DNvIrjrP-t27brEOhwF1Z --channel-id "$YOUTUBE_CHANNEL_ID" --affiliate "📚 推薦 AI 暢銷書 Co-Intelligence → https://www.amazon.com/dp/059371671X?tag=ytstories0413-20" --kofi https://ko-fi.com/ytstories0413
 
       - name: 5b) Make + publish 20s YouTube Short (teaser, links to full video)
         continue-on-error: true
-        env:
-          YOUTUBE_CLIENT_ID: ${{ inputs.publish != 'false' && secrets.YOUTUBE_CLIENT_ID || '' }}
-          YOUTUBE_CLIENT_SECRET: ${{ inputs.publish != 'false' && secrets.YOUTUBE_CLIENT_SECRET || '' }}
-          YOUTUBE_REFRESH_TOKEN: ${{ inputs.publish != 'false' && secrets.YOUTUBE_REFRESH_TOKEN || '' }}
         run: |
           python scripts/make_short.py --video output/final_video.mp4 --output output/short.mp4 --duration 20 --font "Noto Sans CJK TC"
           LINK="$(cat youtube_url.txt 2>/dev/null || echo '')"
-          DESC="$(printf '完整版看這裡：%s\n\n#Shorts %s' "$LINK" "$(cat description.txt 2>/dev/null)")"
-          python scripts/upload_youtube.py --video output/short.mp4 --title "$(cat title.txt) #Shorts" --description "$DESC" --tags "$(cat tags.txt),Shorts" --privacy public --url-out youtube_short_url.txt --channel-id UCvd4nL04uE7lFqkKtzsOwLg
+          DESC="$(printf '完整版看這裡：%s\\n\\n#Shorts %s' "$LINK" "$(cat description.txt 2>/dev/null)")"
+          python scripts/upload_youtube.py --video output/short.mp4 --title "$(cat title.txt) #Shorts" --description "$DESC" --tags "$(cat tags.txt),Shorts" --privacy public --url-out youtube_short_url.txt --channel-id "$YOUTUBE_CHANNEL_ID"
 
       - name: EN-1) Translate scenes + SEO to English (reuse visuals)
         continue-on-error: true
@@ -144,11 +157,7 @@ jobs:
 
       - name: EN-5) Publish English video to YouTube (public)
         continue-on-error: true
-        env:
-          YOUTUBE_CLIENT_ID: ${{ inputs.publish != 'false' && secrets.YOUTUBE_CLIENT_ID || '' }}
-          YOUTUBE_CLIENT_SECRET: ${{ inputs.publish != 'false' && secrets.YOUTUBE_CLIENT_SECRET || '' }}
-          YOUTUBE_REFRESH_TOKEN: ${{ inputs.publish != 'false' && secrets.YOUTUBE_REFRESH_TOKEN || '' }}
-        run: python scripts/upload_youtube.py --video output/final_video_en.mp4 --title "$(cat title_en.txt)" --description "$(cat description_en.txt)" --tags "$(cat tags_en.txt)" --privacy public --url-out youtube_en_url.txt --thumbnail output/thumbnail_en.jpg --playlist PLX0z3_uqHkc2DNvIrjrP-t27brEOhwF1Z --channel-id UCvd4nL04uE7lFqkKtzsOwLg --affiliate "📚 Top AI read — Co-Intelligence by Ethan Mollick → https://www.amazon.com/dp/059371671X?tag=ytstories0413-20" --kofi https://ko-fi.com/ytstories0413
+        run: python scripts/upload_youtube.py --video output/final_video_en.mp4 --title "$(cat title_en.txt)" --description "$(cat description_en.txt)" --tags "$(cat tags_en.txt)" --privacy public --url-out youtube_en_url.txt --thumbnail output/thumbnail_en.jpg --playlist PLX0z3_uqHkc2DNvIrjrP-t27brEOhwF1Z --channel-id "$YOUTUBE_CHANNEL_ID" --affiliate "📚 Top AI read — Co-Intelligence by Ethan Mollick → https://www.amazon.com/dp/059371671X?tag=ytstories0413-20" --kofi https://ko-fi.com/ytstories0413
 
       - name: 5c) Publish to Bilibili
         continue-on-error: true
@@ -162,33 +171,44 @@ jobs:
           fi
           python scripts/upload_bilibili.py --video output/final_video.mp4 --title "$(cat title.txt)" --description "$(cat description.txt)" --tags "$(cat tags.txt)"
 
-      - name: 6) Notify Discord (success)
-        if: success()
+      - name: 6) Notify Discord (smart — detects actual upload results)
+        if: always()
         env:
           WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          if [ -n "$WEBHOOK" ]; then
-            TITLE=$(cat title.txt 2>/dev/null || echo "AI 影片")
-            URL_ZH=$(cat youtube_url.txt 2>/dev/null || echo "")
-            URL_EN=$(cat youtube_en_url.txt 2>/dev/null || echo "")
-            URL_SHORT=$(cat youtube_short_url.txt 2>/dev/null || echo "")
+          if [ -z "$WEBHOOK" ]; then exit 0; fi
+
+          TITLE=$(cat title.txt 2>/dev/null || echo "AI 影片")
+          URL_ZH=$(cat youtube_url.txt 2>/dev/null || echo "")
+          URL_EN=$(cat youtube_en_url.txt 2>/dev/null || echo "")
+          URL_SHORT=$(cat youtube_short_url.txt 2>/dev/null || echo "")
+
+          # Count successes
+          SUCCESS_COUNT=0
+          [ -n "$URL_ZH" ] && SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+          [ -n "$URL_EN" ] && SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+          [ -n "$URL_SHORT" ] && SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+
+          if [ "$SUCCESS_COUNT" -gt 0 ]; then
             MSG="🎬 每日自動影片完成：**${TITLE}**"
             [ -n "$URL_ZH" ] && MSG="${MSG}\n🇹🇼 中文版：${URL_ZH}"
             [ -n "$URL_EN" ] && MSG="${MSG}\n🇺🇸 English：${URL_EN}"
             [ -n "$URL_SHORT" ] && MSG="${MSG}\n📱 Short：${URL_SHORT}"
-            curl -s -H "Content-Type: application/json" \
-              -d "$(python3 -c "import json,sys; print(json.dumps({'content': sys.argv[1]}))" "$MSG")" "$WEBHOOK"
+
+            if [ "$SUCCESS_COUNT" -lt 3 ]; then
+              MISSING=""
+              [ -z "$URL_ZH" ] && MISSING="${MISSING} 🇹🇼中文"
+              [ -z "$URL_EN" ] && MISSING="${MISSING} 🇺🇸英文"
+              [ -z "$URL_SHORT" ] && MISSING="${MISSING} 📱Short"
+              MSG="${MSG}\n⚠️ 部分上傳失敗：${MISSING}（查看 log：${RUN_URL}）"
+            fi
+          else
+            MSG="🔴 每日 AI 影片上傳失敗：**${TITLE}**\n所有平台均未成功 → ${RUN_URL}"
           fi
 
-      - name: 6b) Notify Discord on failure (D12)
-        if: failure()
-        env:
-          WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-        run: |
-          if [ -n "$WEBHOOK" ]; then
-            curl -s -H "Content-Type: application/json" \
-              -d "{\"content\":\"🔴 每日 AI 影片 workflow 失敗！查看 log：${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" "$WEBHOOK"
-          fi
+          curl -s -H "Content-Type: application/json" \
+            -d "$(python3 -c "import json,sys; print(json.dumps({'content': sys.argv[1]}))" "$MSG")" "$WEBHOOK"
 
       - name: Upload artifact
         if: always()
