@@ -189,6 +189,7 @@ jobs:
 
       - name: 6) Notify Discord (smart — detects actual upload results)
         if: always()
+        continue-on-error: true   # a notification failure must never fail the content pipeline (was masking green upload runs as red)
         env:
           WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
