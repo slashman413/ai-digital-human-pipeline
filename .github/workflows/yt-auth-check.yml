@@ -59,3 +59,5 @@ jobs:
               raise SystemExit("::error::auth OK but no channel returned for this account/scope")
           print("AUTH OK ->", items[0]["snippet"]["title"], "| channelId:", items[0]["id"])
           PY
+
+# re-validate after secret update (601998126071 client)
