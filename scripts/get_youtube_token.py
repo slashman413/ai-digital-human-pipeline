@@ -2,7 +2,12 @@
 
 Prereq (in Google Cloud Console, your account):
   1. Create a project, enable "YouTube Data API v3".
-  2. Configure the OAuth consent screen (External; add yourself as a Test user).
+  2. Configure the OAuth consent screen (External), then **PUBLISH the app to
+     "Production"** (OAuth consent screen -> Publishing status -> Publish app).
+     DO NOT leave it in "Testing" — Testing-mode refresh tokens EXPIRE AFTER 7
+     DAYS, which silently breaks the daily uploader every week. Production
+     tokens don't expire (an unverified-app warning at consent is fine for your
+     own channel — click "Advanced -> continue").
   3. Create an OAuth client of type "Desktop app" -> get Client ID + Client Secret.
 
 Then run locally:
