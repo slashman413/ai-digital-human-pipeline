@@ -37,45 +37,47 @@ concurrency:
 
 jobs:
   # ─────────────────────────────────────────────────────────────────────
-  # 🔐 Resolve YouTube credentials from central auth hub
+  # 🎬 Main pipeline
   # ─────────────────────────────────────────────────────────────────────
-  auth:
+  auto:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
-    outputs:
-      client_id: ${{ steps.resolve.outputs.client_id }}
-      client_secret: ${{ steps.resolve.outputs.client_secret }}
-      refresh_token: ${{ steps.resolve.outputs.refresh_token }}
-      channel_id: ${{ steps.resolve.outputs.channel_id }}
-      zh_playlist: ${{ steps.resolve.outputs.zh_playlist }}
-      en_playlist: ${{ steps.resolve.outputs.en_playlist }}
+    timeout-minutes: 90
     steps:
+      - uses: actions/checkout@v4
+
+      # 🔐 Resolve YouTube credentials from central auth hub — in-job, NOT via
+      # job outputs: job outputs are never masked, so the old auth-job pattern
+      # printed the client secret + refresh token in cleartext in public logs.
+      # Here ::add-mask:: is registered before the values are exported, so all
+      # later log lines (including step env dumps) show *** instead.
+      # On dry-run (publish=false) nothing is exported → scripts auto-dry-run.
       - uses: actions/checkout@v4
         with:
           repository: slashman413/youtube-auth-central
           token: ${{ secrets.YT_AUTH_TOKEN }}
           path: .central
 
-      - id: resolve
+      - name: Resolve YouTube credentials (masked)
         shell: bash
-        run: .central/scripts/resolve-credentials.sh ai-digital-human
+        run: |
+          CONFIG=.central/config.json
+          get() { jq -r ".[\"ai-digital-human\"].$1 // \"\"" "$CONFIG"; }
+          for key in client_secret refresh_token; do
+            val="$(get "$key")"
+            if [ -n "$val" ]; then echo "::add-mask::$val"; fi
+          done
+          if [ "${{ inputs.publish }}" = "false" ]; then
+            echo "[dry-run] publish=false — not exporting YouTube credentials"
+            exit 0
+          fi
+          {
+            echo "YOUTUBE_CLIENT_ID=$(get client_id)"
+            echo "YOUTUBE_CLIENT_SECRET=$(get client_secret)"
+            echo "YOUTUBE_REFRESH_TOKEN=$(get refresh_token)"
+            echo "YOUTUBE_CHANNEL_ID=$(get channel_id)"
+          } >> "$GITHUB_ENV"
+          echo "[ok] Resolved client 'ai-digital-human'"
 
-  # ─────────────────────────────────────────────────────────────────────
-  # 🎬 Main pipeline
-  # ─────────────────────────────────────────────────────────────────────
-  auto:
-    needs: [auth]
-    runs-on: ubuntu-latest
-    timeout-minutes: 90
-    # YouTube credentials come from auth job (central repo).
-    # On dry-run (publish=false) they're cleared → scripts auto-dry-run.
-    env:
-      YOUTUBE_CLIENT_ID: ${{ inputs.publish != 'false' && needs.auth.outputs.client_id || '' }}
-      YOUTUBE_CLIENT_SECRET: ${{ inputs.publish != 'false' && needs.auth.outputs.client_secret || '' }}
-      YOUTUBE_REFRESH_TOKEN: ${{ inputs.publish != 'false' && needs.auth.outputs.refresh_token || '' }}
-      YOUTUBE_CHANNEL_ID: ${{ inputs.publish != 'false' && needs.auth.outputs.channel_id || '' }}
-    steps:
-      - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'

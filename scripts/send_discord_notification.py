@@ -122,7 +122,11 @@ def main() -> int:
     req = urllib.request.Request(
         webhook,
         data=body,
-        headers={"Content-Type": "application/json"},
+        headers={
+            "Content-Type": "application/json",
+            # Cloudflare blocks the default Python-urllib UA with 403 "error code: 1010".
+            "User-Agent": "ai-digital-human-pipeline (https://github.com/slashman413/ai-digital-human-pipeline, 1.0)",
+        },
         method="POST",
     )
 
