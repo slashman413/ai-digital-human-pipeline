@@ -1,18 +1,12 @@
 #!/usr/bin/env python3
-"""
-Send a rich Discord notification with embed + thumbnails for video upload results.
+"""Send a rich Discord notification with embed + thumbnails for video upload results."""
+from __future__ import annotations
 
-Reads youtube_url.txt / youtube_en_url.txt / youtube_short_url.txt from the
-working directory, builds an embed with YouTube thumbnails, and posts to webhook.
-
-Environment variables:
-  WEBHOOK  — Discord webhook URL (required)
-  RUN_URL  — GitHub Actions run URL (for click-through)
-"""
 import json
 import os
 import re
 import sys
+import urllib.error
 import urllib.request
 
 

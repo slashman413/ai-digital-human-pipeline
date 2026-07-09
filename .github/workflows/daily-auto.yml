@@ -192,7 +192,7 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           if [ -z "$WEBHOOK" ]; then exit 0; fi
-          python3 scripts/send_discord_notification.py
+          python scripts/send_discord_notification.py
       - name: Upload artifact
         if: always()
         uses: actions/upload-artifact@v4
