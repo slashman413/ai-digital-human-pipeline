@@ -192,38 +192,7 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           if [ -z "$WEBHOOK" ]; then exit 0; fi
-
-          TITLE=$(cat title.txt 2>/dev/null || echo "AI 影片")
-          URL_ZH=$(cat youtube_url.txt 2>/dev/null || echo "")
-          URL_EN=$(cat youtube_en_url.txt 2>/dev/null || echo "")
-          URL_SHORT=$(cat youtube_short_url.txt 2>/dev/null || echo "")
-
-          # Count successes
-          SUCCESS_COUNT=0
-          [ -n "$URL_ZH" ] && SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
-          [ -n "$URL_EN" ] && SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
-          [ -n "$URL_SHORT" ] && SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
-
-          if [ "$SUCCESS_COUNT" -gt 0 ]; then
-            MSG="🎬 每日自動影片完成：**${TITLE}**"
-            [ -n "$URL_ZH" ] && MSG="${MSG}\n🇹🇼 中文版：${URL_ZH}"
-            [ -n "$URL_EN" ] && MSG="${MSG}\n🇺🇸 English：${URL_EN}"
-            [ -n "$URL_SHORT" ] && MSG="${MSG}\n📱 Short：${URL_SHORT}"
-
-            if [ "$SUCCESS_COUNT" -lt 3 ]; then
-              MISSING=""
-              [ -z "$URL_ZH" ] && MISSING="${MISSING} 🇹🇼中文"
-              [ -z "$URL_EN" ] && MISSING="${MISSING} 🇺🇸英文"
-              [ -z "$URL_SHORT" ] && MISSING="${MISSING} 📱Short"
-              MSG="${MSG}\n⚠️ 部分上傳失敗：${MISSING}（查看 log：${RUN_URL}）"
-            fi
-          else
-            MSG="🔴 每日 AI 影片上傳失敗：**${TITLE}**\n所有平台均未成功 → ${RUN_URL}"
-          fi
-
-          curl -s -H "Content-Type: application/json" \
-            -d "$(python3 -c "import json,sys; print(json.dumps({'content': sys.argv[1]}))" "$MSG")" "$WEBHOOK"
-
+          python3 scripts/send_discord_notification.py
       - name: Upload artifact
         if: always()
         uses: actions/upload-artifact@v4
