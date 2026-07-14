@@ -39,7 +39,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--video", required=True)
     ap.add_argument("--output", default="output/short.mp4")
-    ap.add_argument("--start", type=float, default=-1, help="start sec; -1 = auto (~15%% in)")
+    ap.add_argument("--start", type=float, default=-1, help="start sec; -1 = auto (t=0, the cold-open hook)")
     ap.add_argument("--duration", type=float, default=20)
     ap.add_argument("--font", default="Noto Sans CJK TC", help="fontconfig name (Linux/runner)")
     ap.add_argument("--fontfile", default="", help="path to a .ttf/.ttc (use on Windows where fontconfig is absent)")
@@ -49,8 +49,9 @@ def main() -> int:
     total = probe_duration(args.video)
     start = args.start
     if start < 0:
-        # skip the very intro; start ~15% in, but leave room for the full clip
-        start = max(0.0, min(total * 0.15, max(0.0, total - args.duration)))
+        # Scene 1 is written as a self-contained loopable hook (see
+        # generate_longform.py) — cut the Short from t=0 to use it.
+        start = 0.0
     dur = min(args.duration, max(5.0, total - start)) if total else args.duration
 
     # 9:16 canvas: blurred, zoom-filled background + the full landscape frame centered;

@@ -40,6 +40,8 @@ def outline(topic: str, scenes: int) -> dict:
     prompt = (
         f"{topic_line}\n"
         f"規劃一支長影音，切成剛好 {scenes} 個分鏡(scene)，要有起承轉合、循序漸進、不重複。\n"
+        "第 1 個 scene 必須是『冷開場 hook』：直接丟出全片最震撼的數字、事實或懸念，"
+        "禁止問候語或前言（這段會被剪成 Shorts 單獨發布）。\n"
         "每個 scene 給：\n"
         "1) brief：用一句話說明這段要講什麼（之後會擴寫成旁白）。\n"
         "2) image_prompt：一句英文，描述這段對應的『真實照片』背景"
@@ -63,6 +65,14 @@ def expand(title: str, briefs: list[str], idx: int, per_chars: int) -> str:
         f"請把『本段要點』擴寫成約 {per_chars} 字的繁體中文口語旁白，"
         "承接前段、自然帶到下段，舉例具體、節奏流暢。只輸出這段旁白文字。"
     )
+    if idx == 0:
+        # Scene 1 doubles as the standalone teaser Short (cut from t=0): it must
+        # open on the payload and end on an unanswered hook so the Short loops.
+        context += (
+            "\n本段是開場 hook：第一句直接丟出最震撼的數字或事實；"
+            "最後一句拋出一個本段不回答的懸念問題，"
+            "讓這段可獨立成 Shorts 且結尾能自然接回開頭循環。"
+        )
     return complete(WRITER_SYS, context, max_tokens=1200).strip()
 
 
