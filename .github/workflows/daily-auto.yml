@@ -98,6 +98,14 @@ jobs:
       - name: Install Python deps
         run: pip install -r requirements.txt google-api-python-client google-auth google-auth-oauthlib
 
+      - name: Connect to Tailscale (reach local vLLM; falls back to DeepSeek)
+        continue-on-error: true
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
       - name: 1) Pick trending topic
         id: topic
         env:

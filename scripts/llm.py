@@ -12,12 +12,42 @@ Usage:
 from __future__ import annotations
 
 import os
+import urllib.request
 
 # Provider models (override via env).
 DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-v4-flash")
 ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-opus-4-8")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o")
 DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
+
+# Local vLLM (OpenAI-compatible) on the DGX, reached over Tailscale from CI.
+# Preferred when reachable; otherwise the chain falls through to DeepSeek etc.
+LOCAL_BASE_URL = os.getenv("LLM_BASE_URL", "http://100.80.243.33:8000/v1")
+LOCAL_MODEL = os.getenv("LLM_MODEL", "nvidia/Qwen3.6-35B-A3B-NVFP4")
+LOCAL_API_KEY = os.getenv("LLM_API_KEY", "local")  # vLLM ignores the value
+
+
+def _local_reachable(timeout: int = 6) -> bool:
+    try:
+        with urllib.request.urlopen(LOCAL_BASE_URL.rstrip("/") + "/models", timeout=timeout) as r:
+            return 200 <= r.status < 300
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _via_local(system: str, user: str, max_tokens: int) -> str:
+    from openai import OpenAI
+
+    client = OpenAI(api_key=LOCAL_API_KEY, base_url=LOCAL_BASE_URL, timeout=180, max_retries=2)
+    resp = client.chat.completions.create(
+        model=LOCAL_MODEL,
+        max_tokens=max_tokens,
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
+    )
+    return (resp.choices[0].message.content or "").strip()
 
 
 def _via_anthropic(system: str, user: str, max_tokens: int) -> str:
@@ -77,7 +107,12 @@ def _offline_stub(system: str, user: str) -> str:
 
 
 def complete(system: str, user: str, max_tokens: int = 1200) -> str:
-    """Return an LLM completion. Provider preference: DeepSeek → Anthropic → OpenAI → stub."""
+    """Return an LLM completion. Preference: local vLLM → DeepSeek → Anthropic → OpenAI → stub."""
+    if os.getenv("LLM_LOCAL", "1") != "0" and _local_reachable():
+        try:
+            return _via_local(system, user, max_tokens)
+        except Exception as e:  # noqa: BLE001 — never hard-fail the pipeline
+            print(f"[llm] local vLLM call failed ({e}); trying next provider.")
     if os.getenv("DEEPSEEK_API_KEY"):
         try:
             return _via_deepseek(system, user, max_tokens)
