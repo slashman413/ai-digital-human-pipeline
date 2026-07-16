@@ -23,15 +23,31 @@ def format_timestamp(seconds: float) -> str:
 
 
 def segments_to_srt(segments) -> str:
-    """Render whisper segments into standard SRT text."""
-    lines = []
-    for i, seg in enumerate(segments, start=1):
-        start = format_timestamp(float(seg.get("start", 0.0)))
-        end = format_timestamp(float(seg.get("end", 0.0)))
+    """Render whisper segments into standard SRT text.
+
+    Collapses consecutive duplicate cue texts into a single cue. Whisper
+    (especially the tiny model) is prone to repetition loops where the same
+    line is emitted over and over; merging identical back-to-back cues keeps
+    that repetition off screen instead of flashing the same subtitle.
+    """
+    cues = []
+    for seg in segments:
         text = str(seg.get("text", "")).strip()
+        if not text:
+            continue
+        start = float(seg.get("start", 0.0))
+        end = float(seg.get("end", 0.0))
+        if cues and cues[-1]["text"] == text:
+            # Same text as the previous cue -> extend its end, don't repeat it.
+            cues[-1]["end"] = max(cues[-1]["end"], end)
+            continue
+        cues.append({"start": start, "end": end, "text": text})
+
+    lines = []
+    for i, cue in enumerate(cues, start=1):
         lines.append(str(i))
-        lines.append(f"{start} --> {end}")
-        lines.append(text)
+        lines.append(f"{format_timestamp(cue['start'])} --> {format_timestamp(cue['end'])}")
+        lines.append(cue["text"])
         lines.append("")  # blank line separates cues
     return "\n".join(lines).strip() + "\n"
 
@@ -57,6 +73,8 @@ def main() -> None:
     parser.add_argument("--audio", required=True, help="Input audio file (mp3).")
     parser.add_argument("--model", required=True, help="Whisper model name, e.g. tiny.")
     parser.add_argument("--output", required=True, help="Output .srt path.")
+    parser.add_argument("--language", default=None,
+                        help="Force transcription language (e.g. zh, en). Default: auto-detect.")
     args = parser.parse_args()
 
     # Guard: missing or empty audio -> placeholder SRT.
@@ -69,7 +87,21 @@ def main() -> None:
         import whisper  # imported lazily so a missing package is handled gracefully
 
         model = whisper.load_model(args.model)
-        result = model.transcribe(args.audio)
+        # Anti-repetition decoding options. condition_on_previous_text=False is
+        # the key one: it stops Whisper feeding its own prior output back in,
+        # which is what makes the tiny model loop the same phrase forever.
+        # compression_ratio_threshold + temperature fallback re-decode any
+        # segment whose output looks repetitive/degenerate.
+        result = model.transcribe(
+            args.audio,
+            language=args.language,
+            task="transcribe",
+            condition_on_previous_text=False,
+            compression_ratio_threshold=2.4,
+            logprob_threshold=-1.0,
+            no_speech_threshold=0.6,
+            temperature=(0.0, 0.2, 0.4, 0.6, 0.8, 1.0),
+        )
         segments = result.get("segments") or []
         if not segments:
             print("[warn] whisper returned no segments; writing placeholder SRT.")
